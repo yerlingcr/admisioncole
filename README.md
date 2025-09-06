@@ -1,277 +1,202 @@
-# 🎓 Sistema de Admisión 2025
+# Sistema de Admisión 2025
 
-Sistema de gestión de admisiones para centros educativos con sistema de quiz personalizado para estudiantes.
+Sistema completo de gestión de admisión para instituciones educativas, desarrollado con React.js y Supabase.
 
-## 🚀 Características
+## 🚀 Características Principales
 
-- **Sistema de Login Personalizado** - Autenticación directa con Supabase (sin Supabase Auth)
-- **Gestión de Roles** - Estudiante, Administrador, Profesor
-- **Sistema de Quiz Inteligente** - Preguntas aleatorias con opciones aleatorizadas
-- **Interfaz Moderna** - Diseño "Liquid Glass" con Tailwind CSS y DaisyUI
-- **Responsive Design** - Optimizado para móvil y desktop
-- **Gestión de Sesiones** - Persistencia de login con localStorage
+### Para Estudiantes
+- **Dashboard Personalizado**: Información personal, oportunidades disponibles e historial de intentos
+- **Quiz Dinámico**: Preguntas aleatorias por categoría asignada, opciones aleatorizadas
+- **Resultados Detallados**: Puntuación, tiempo utilizado y análisis de respuestas
+- **Gestión de Intentos**: Control automático de oportunidades disponibles
 
-## 🛠️ Tecnologías
+### Para Administradores
+- **Dashboard Principal**: Estadísticas generales del sistema
+- **Gestión de Usuarios**: Crear, editar y asignar categorías a estudiantes
+- **Gestión de Preguntas**: Crear, editar preguntas con imágenes y opciones múltiples
+- **Gestión de Categorías**: Administrar categorías de preguntas
+- **Configuración**: Ajustar tiempo límite, total de preguntas e intentos permitidos
 
-- **Frontend:** React 18 + Vite
-- **Styling:** Tailwind CSS 3.4 + DaisyUI
-- **Backend:** Supabase (PostgreSQL)
-- **Routing:** React Router DOM
-- **Estado:** React Context API
-- **Autenticación:** Sistema personalizado con Supabase
+## 🛠️ Tecnologías Utilizadas
 
-## 📋 Requisitos Previos
+- **Frontend**: React.js 18, Vite, Tailwind CSS, DaisyUI
+- **Backend**: Supabase (PostgreSQL, Auth, Storage)
+- **Autenticación**: Supabase Auth con roles (Administrador, Estudiante, Profesor)
+- **Almacenamiento**: Supabase Storage para imágenes
+- **UI/UX**: SweetAlert2 para alertas, React Router para navegación
 
-- Node.js 18+ 
+## 📁 Estructura del Proyecto
+
+```
+admision2025/
+├── public/
+│   ├── img/
+│   │   ├── bg/                    # Imágenes de fondo
+│   │   │   ├── 01.jpg
+│   │   │   └── escudovok.png
+│   │   ├── ico/                   # Iconos y favicon
+│   │   │   ├── admision2025.ico
+│   │   │   └── admision2025.png
+│   │   └── questions/             # Imágenes de preguntas
+│   └── index.html
+├── src/
+│   ├── components/                # Componentes React
+│   │   ├── AdminDashboard.jsx     # Dashboard principal de administración
+│   │   ├── ConfiguracionPrueba.jsx # Configuración del quiz
+│   │   ├── ErrorBoundary.jsx     # Manejo de errores
+│   │   ├── EstudianteDashboard.jsx # Dashboard del estudiante
+│   │   ├── GestionCategorias.jsx # Gestión de categorías
+│   │   ├── GestionPreguntas.jsx  # Gestión de preguntas
+│   │   ├── GestionUsuarios.jsx  # Gestión de usuarios
+│   │   ├── LoadingSpinner.jsx    # Componente de carga
+│   │   ├── Login.jsx             # Página de inicio de sesión
+│   │   ├── ProtectedRoute.jsx    # Protección de rutas
+│   │   ├── Quiz.jsx              # Interfaz del quiz
+│   │   ├── QuizResult.jsx        # Resultados del quiz
+│   │   └── ThemeToggle.jsx       # Toggle de tema
+│   ├── contexts/
+│   │   └── AuthContext.jsx       # Contexto de autenticación
+│   ├── hooks/
+│   │   └── useLocalStorage.js    # Hook para localStorage
+│   ├── lib/
+│   │   ├── supabase.js           # Configuración de Supabase
+│   │   └── supabaseConfig.js     # Configuración adicional
+│   ├── services/                 # Servicios de datos
+│   │   ├── configuracionService.js # Configuración del quiz
+│   │   ├── geografiaService.js   # Datos geográficos de Costa Rica
+│   │   ├── institucionService.js # Información institucional
+│   │   ├── quizService.js        # Lógica del quiz
+│   │   ├── storageService.js     # Gestión de archivos
+│   │   └── usuarioCategoriasService.js # Asignación de categorías
+│   ├── utils/
+│   │   └── validation.js         # Utilidades de validación
+│   ├── App.jsx                   # Componente principal
+│   ├── main.jsx                  # Punto de entrada
+│   └── index.css                 # Estilos globales
+├── database_setup.sql            # Script de configuración inicial
+├── crear_tabla_usuario_categorias.sql # Script de tabla de categorías
+├── package.json                  # Dependencias del proyecto
+├── tailwind.config.js           # Configuración de Tailwind
+├── vite.config.js               # Configuración de Vite
+└── README.md                    # Este archivo
+```
+
+## 🗄️ Base de Datos
+
+### Tablas Principales
+- **usuarios**: Información de usuarios (administradores, estudiantes, profesores)
+- **preguntas_quiz**: Preguntas del quiz con imágenes opcionales
+- **opciones_respuesta**: Opciones múltiples para cada pregunta
+- **categorias_quiz**: Categorías disponibles para las preguntas
+- **usuario_categorias**: Asignación de categorías a usuarios
+- **intentos_quiz**: Registro de intentos de los estudiantes
+- **respuestas_estudiante**: Respuestas individuales de cada intento
+- **configuracion_quiz**: Configuración global del sistema
+- **informacion_institucional**: Datos de la institución educativa
+
+### Características de Seguridad
+- **Row Level Security (RLS)**: Políticas de seguridad a nivel de fila
+- **Autenticación por roles**: Control de acceso basado en roles
+- **Validación de datos**: Validaciones tanto en frontend como backend
+
+## 🎨 Paleta de Colores
+
+El sistema utiliza una paleta de colores consistente:
+- **Primario**: Marrón/Dorado (`#f4b100`, `#amber-600`)
+- **Secundario**: Grises (`#gray-50`, `#gray-800`)
+- **Acentos**: Verde para respuestas correctas, Rojo para incorrectas
+- **Fondo**: Gradientes suaves con tonos tierra
+
+## 🚀 Instalación y Configuración
+
+### Prerrequisitos
+- Node.js 18+
 - npm o yarn
 - Cuenta de Supabase
 
-## 🚀 Instalación
+### Pasos de Instalación
 
-1. **Clonar el repositorio:**
-```bash
-git clone https://github.com/yerlingcr/admision2025.git
-cd admision2025
-```
+1. **Clonar el repositorio**
+   ```bash
+   git clone <repository-url>
+   cd admision2025
+   ```
 
-2. **Instalar dependencias:**
-```bash
-npm install
-```
+2. **Instalar dependencias**
+   ```bash
+   npm install
+   ```
 
-3. **Configurar variables de entorno:**
-```bash
-cp .env.example .env.local
-```
+3. **Configurar variables de entorno**
+   ```bash
+   cp env.local.example env.local
+   ```
+   Editar `env.local` con tus credenciales de Supabase:
+   ```
+   VITE_SUPABASE_URL=tu_supabase_url
+   VITE_SUPABASE_ANON_KEY=tu_supabase_anon_key
+   ```
 
-Editar `.env.local` con tus credenciales de Supabase:
-```env
-VITE_SUPABASE_URL=tu_url_de_supabase
-VITE_SUPABASE_ANON_KEY=tu_anon_key_de_supabase
-```
+4. **Configurar la base de datos**
+   - Ejecutar `database_setup.sql` en tu instancia de Supabase
+   - Ejecutar `crear_tabla_usuario_categorias.sql` si es necesario
 
-4. **Ejecutar en desarrollo:**
-```bash
-npm run dev
-```
+5. **Iniciar el servidor de desarrollo**
+   ```bash
+   npm run dev
+   ```
 
-## 🗄️ Configuración de Base de Datos
+## 📱 Funcionalidades Detalladas
 
-### 1. Crear Tabla de Usuarios
-```sql
-CREATE TABLE usuarios (
-  identificacion VARCHAR(20) PRIMARY KEY,
-  nombre VARCHAR(100) NOT NULL,
-  primer_apellido VARCHAR(100) NOT NULL,
-  segundo_apellido VARCHAR(100),
-  sexo VARCHAR(20) CHECK (sexo IN ('Femenino', 'Masculino')),
-  fecha_nacimiento DATE,
-  provincia VARCHAR(100),
-  canton VARCHAR(100),
-  distrito VARCHAR(100),
-  otras_senas TEXT,
-  rol VARCHAR(20) CHECK (rol IN ('Estudiante', 'Administrador', 'Profesor')),
-  password VARCHAR(255) NOT NULL,
-  email VARCHAR(255),
-  created_at TIMESTAMP DEFAULT NOW(),
-  updated_at TIMESTAMP DEFAULT NOW(),
-  estado VARCHAR(20) DEFAULT 'Activo'
-);
-```
+### Sistema de Quiz
+- **Preguntas Aleatorias**: Algoritmo Fisher-Yates para aleatorización robusta
+- **Opciones Aleatorizadas**: Las opciones de respuesta se mezclan automáticamente
+- **Categorización**: Cada estudiante ve solo preguntas de su categoría asignada
+- **Control de Tiempo**: Timer automático con límite configurable
+- **Validación**: Verificación de disponibilidad de preguntas por categoría
 
-### 2. Crear Tablas del Quiz
-```sql
--- Tabla de preguntas
-CREATE TABLE preguntas_quiz (
-  id SERIAL PRIMARY KEY,
-  pregunta TEXT NOT NULL,
-  imagen_url VARCHAR(500),
-  categoria VARCHAR(100),
-  nivel_dificultad VARCHAR(20),
-  orden_mostrar INTEGER DEFAULT 0,
-  activa BOOLEAN DEFAULT true,
-  usuario_creador VARCHAR(20) REFERENCES usuarios(identificacion),
-  usuario_modificador VARCHAR(20) REFERENCES usuarios(identificacion),
-  created_at TIMESTAMP DEFAULT NOW(),
-  updated_at TIMESTAMP DEFAULT NOW()
-);
+### Gestión de Usuarios
+- **Campos Opcionales**: Provincia, Cantón, Distrito y Email son opcionales
+- **Asignación de Categorías**: Un estudiante puede tener una sola categoría
+- **Reset de Oportunidades**: Los administradores pueden resetear intentos de estudiantes
+- **Datos Geográficos**: Integración con datos completos de Costa Rica
 
--- Tabla de opciones de respuesta
-CREATE TABLE opciones_respuesta (
-  id SERIAL PRIMARY KEY,
-  pregunta_id INTEGER REFERENCES preguntas_quiz(id),
-  texto_opcion TEXT NOT NULL,
-  es_correcta BOOLEAN DEFAULT false,
-  orden_mostrar INTEGER DEFAULT 0,
-  activa BOOLEAN DEFAULT true,
-  usuario_creador VARCHAR(20) REFERENCES usuarios(identificacion),
-  usuario_modificador VARCHAR(20) REFERENCES usuarios(identificacion),
-  created_at TIMESTAMP DEFAULT NOW(),
-  updated_at TIMESTAMP DEFAULT NOW()
-);
+### Gestión de Contenido
+- **Subida de Imágenes**: Compresión automática y validación de formatos
+- **Eliminación Inteligente**: Las imágenes canceladas se eliminan del storage
+- **Categorización Dinámica**: Las categorías se cargan desde la base de datos
+- **Validación de Formularios**: Validación en tiempo real
 
--- Tabla de intentos de quiz
-CREATE TABLE intentos_quiz (
-  id SERIAL PRIMARY KEY,
-  estudiante_id VARCHAR(20) REFERENCES usuarios(identificacion),
-  estado VARCHAR(20) DEFAULT 'En Progreso',
-  fecha_inicio TIMESTAMP DEFAULT NOW(),
-  fecha_fin TIMESTAMP,
-  tiempo_utilizado_segundos INTEGER,
-  puntuacion INTEGER,
-  preguntas_respondidas INTEGER,
-  respuestas_correctas INTEGER
-);
-
--- Tabla de respuestas del estudiante
-CREATE TABLE respuestas_estudiante (
-  id SERIAL PRIMARY KEY,
-  intento_id INTEGER REFERENCES intentos_quiz(id),
-  pregunta_id INTEGER REFERENCES preguntas_quiz(id),
-  opcion_seleccionada_id INTEGER REFERENCES opciones_respuesta(id),
-  tiempo_respuesta_segundos INTEGER,
-  es_correcta BOOLEAN,
-  created_at TIMESTAMP DEFAULT NOW()
-);
-
--- Tabla de configuración del quiz
-CREATE TABLE configuracion_quiz (
-  id SERIAL PRIMARY KEY,
-  tiempo_limite_minutos INTEGER DEFAULT 5,
-  total_preguntas INTEGER DEFAULT 5,
-  activa BOOLEAN DEFAULT true,
-  created_at TIMESTAMP DEFAULT NOW(),
-  updated_at TIMESTAMP DEFAULT NOW()
-);
-```
-
-### 3. Configurar RLS (Row Level Security)
-```sql
--- Política para usuarios
-CREATE POLICY "Permitir acceso a usuarios" ON usuarios FOR SELECT USING (true);
-
--- Política para intentos de quiz
-CREATE POLICY "Permitir gestión de intentos" ON intentos_quiz 
-FOR ALL USING (true);
-
--- Política para respuestas del estudiante
-CREATE POLICY "Permitir gestión de respuestas" ON respuestas_estudiante 
-FOR ALL USING (true);
-```
-
-## 👥 Usuarios de Prueba
-
-### Administrador
-- **Identificación:** ADMIN001
-- **Contraseña:** admin123
-- **Rol:** Administrador
-
-### Estudiante
-- **Identificación:** EST001
-- **Contraseña:** est123
-- **Rol:** Estudiante
-
-## 🎯 Funcionalidades por Rol
-
-### 👨‍🎓 Estudiante
-- Pantalla de bienvenida personalizada
-- Sistema de quiz con cronómetro
-- Preguntas aleatorias con opciones aleatorizadas
-- Navegación entre preguntas
-- Resultados finales con puntuación
-
-### 👨‍💼 Administrador
-- Dashboard de configuración
-- Gestión de preguntas y opciones
-- Configuración del sistema
-
-### 👨‍🏫 Profesor
-- Dashboard específico (en desarrollo)
-
-## 🎨 Características de UI/UX
-
-- **Diseño "Liquid Glass"** - Efectos de transparencia y blur
-- **Tema Responsive** - Adaptable a todos los dispositivos
-- **Navegación Intuitiva** - Flujo claro y sencillo
-- **Feedback Visual** - Indicadores de progreso y estado
-- **Accesibilidad** - Contraste y legibilidad optimizados
-
-## 📱 Responsive Design
-
-- **Mobile First** - Optimizado para dispositivos móviles
-- **Breakpoints** - Adaptable a tablets y desktop
-- **Touch Friendly** - Interacciones táctiles optimizadas
-
-## 🚀 Scripts Disponibles
+## 🔧 Scripts Disponibles
 
 ```bash
-npm run dev          # Desarrollo local
-npm run build        # Build de producción
-npm run preview      # Preview del build
-npm run lint         # Linting del código
-npm run lint:fix     # Auto-fix de linting
-npm run format       # Formateo del código
-npm run clean        # Limpieza de archivos
-```
-
-## 🔧 Estructura del Proyecto
-
-```
-src/
-├── components/          # Componentes React
-│   ├── Login.jsx       # Sistema de autenticación
-│   ├── Quiz.jsx        # Sistema de quiz
-│   ├── QuizResult.jsx  # Resultados del quiz
-│   └── ...
-├── contexts/           # Contextos de React
-│   └── AuthContext.jsx # Contexto de autenticación
-├── services/           # Servicios de API
-│   └── quizService.js  # Servicio del quiz
-├── hooks/              # Hooks personalizados
-├── utils/              # Utilidades
-└── ...
+npm run dev          # Servidor de desarrollo
+npm run build        # Construcción para producción
+npm run preview      # Vista previa de la construcción
+npm run lint         # Linter de código
 ```
 
 ## 🐛 Solución de Problemas
 
-### Error de Conexión a Supabase
-- Verificar variables de entorno
-- Confirmar credenciales en Supabase
-- Verificar políticas RLS
+### Problemas Comunes
+1. **Error de conexión a Supabase**: Verificar variables de entorno
+2. **Imágenes no cargan**: Verificar políticas RLS del storage
+3. **Quiz no inicia**: Verificar que el estudiante tenga categoría asignada
+4. **Permisos denegados**: Verificar políticas RLS de las tablas
 
-### Problemas de Autenticación
-- Limpiar localStorage
-- Verificar estructura de tabla usuarios
-- Confirmar campos de contraseña
-
-### Quiz No Funciona
-- Verificar datos en tablas del quiz
-- Confirmar relaciones entre tablas
-- Revisar políticas RLS
-
-## 🤝 Contribución
-
-1. Fork el proyecto
-2. Crea una rama para tu feature (`git checkout -b feature/AmazingFeature`)
-3. Commit tus cambios (`git commit -m 'Add some AmazingFeature'`)
-4. Push a la rama (`git push origin feature/AmazingFeature`)
-5. Abre un Pull Request
+### Logs de Debug
+El sistema incluye logs detallados en la consola del navegador para facilitar el debugging.
 
 ## 📄 Licencia
 
-Este proyecto está bajo la Licencia MIT. Ver `LICENSE` para más detalles.
+Este proyecto es privado y está destinado para uso interno de la institución educativa.
 
-## 👨‍💻 Autor
+## 👥 Contribuidores
 
-**Yerling** - [yerlingcr@gmail.com](mailto:yerlingcr@gmail.com)
-
-## 🙏 Agradecimientos
-
-- **Arakary Solutions** - Desarrollo y soporte técnico
-- **Supabase** - Backend as a Service
-- **Tailwind CSS** - Framework de estilos
-- **DaisyUI** - Componentes UI
+- **Desarrollador Principal**: Sistema desarrollado para admisión 2025
+- **Institución**: Centro Educativo con especialidad en Secretariado Ejecutivo
 
 ---
 
-⭐ **Si te gusta este proyecto, dale una estrella en GitHub!**
+**Última actualización**: Diciembre 2024
+**Versión**: 1.0.0

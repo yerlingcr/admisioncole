@@ -6,6 +6,10 @@ import EstudianteDashboard from './components/EstudianteDashboard'
 import Quiz from './components/Quiz'
 import QuizResult from './components/QuizResult'
 import AdminDashboard from './components/AdminDashboard'
+import GestionPreguntas from './components/GestionPreguntas'
+import GestionUsuarios from './components/GestionUsuarios'
+import GestionCategorias from './components/GestionCategorias'
+import ConfiguracionPrueba from './components/ConfiguracionPrueba'
 import ThemeToggle from './components/ThemeToggle'
 
 function App() {
@@ -42,6 +46,10 @@ function App() {
                 <ProtectedRoute requiredRoles={['Administrador']}>
                   <Routes>
                     <Route path="dashboard" element={<AdminDashboard />} />
+                    <Route path="gestion-preguntas" element={<GestionPreguntas />} />
+                    <Route path="gestion-usuarios" element={<GestionUsuarios />} />
+                    <Route path="gestion-categorias" element={<GestionCategorias />} />
+                    <Route path="configuracion-prueba" element={<ConfiguracionPrueba />} />
                     <Route path="*" element={<Navigate to="dashboard" replace />} />
                   </Routes>
                 </ProtectedRoute>

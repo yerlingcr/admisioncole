@@ -15,37 +15,48 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(false)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [initializing, setInitializing] = useState(true)
 
-  // Verificar si hay una sesión activa al cargar la app
+  // Restaurar sesión al montar la aplicación
   useEffect(() => {
-    checkSession()
-  }, [])
-
-  const checkSession = async () => {
-    try {
-      const userInfo = localStorage.getItem('userInfo')
-      if (!userInfo) {
+    const restoreSession = async () => {
+      try {
+        console.log('🔄 Restaurando sesión desde localStorage...')
+        const userInfo = localStorage.getItem('userInfo')
+        const sessionToken = localStorage.getItem('sessionToken')
+        
+        if (userInfo && sessionToken) {
+          const userData = JSON.parse(userInfo)
+          console.log('📱 Datos de usuario encontrados:', userData)
+          
+          setUser({
+            identificacion: userData.identificacion,
+            nombre: userData.nombre,
+            primer_apellido: userData.primer_apellido,
+            segundo_apellido: userData.segundo_apellido,
+            rol: userData.rol
+          })
+          setIsAuthenticated(true)
+          console.log('✅ Sesión restaurada exitosamente')
+        } else {
+          console.log('❌ No hay datos de sesión en localStorage')
+          setIsAuthenticated(false)
+        }
+      } catch (error) {
+        console.error('❌ Error restaurando sesión:', error)
+        // Limpiar datos corruptos
+        localStorage.removeItem('userInfo')
+        localStorage.removeItem('sessionToken')
         setIsAuthenticated(false)
-        return false
+      } finally {
+        // Importante: marcar que la inicialización terminó
+        setInitializing(false)
+        console.log('🏁 Inicialización completada')
       }
-
-      // Restaurar usuario desde localStorage
-      const userData = JSON.parse(userInfo)
-      setUser({
-        identificacion: userData.identificacion,
-        nombre: userData.nombre,
-        primer_apellido: userData.primer_apellido,
-        segundo_apellido: userData.segundo_apellido,
-        rol: userData.rol
-      })
-      setIsAuthenticated(true)
-      return true
-    } catch (error) {
-      console.error('Error verificando sesión:', error)
-      setIsAuthenticated(false)
-      return false
     }
-  }
+
+    restoreSession()
+  }, [])
 
   const login = async (identificacion, password) => {
     try {
@@ -157,35 +168,7 @@ export const AuthProvider = ({ children }) => {
     return !!user
   }
 
-  // Restaurar sesión al montar la aplicación
-  useEffect(() => {
-    const restoreSession = async () => {
-      try {
-        const userInfo = localStorage.getItem('userInfo')
-        const sessionToken = localStorage.getItem('sessionToken')
-        
-        if (userInfo && sessionToken) {
-          const userData = JSON.parse(userInfo)
-          setUser({
-            identificacion: userData.identificacion,
-            nombre: userData.nombre,
-            primer_apellido: userData.primer_apellido,
-            segundo_apellido: userData.segundo_apellido,
-            rol: userData.rol
-          })
-          setIsAuthenticated(true)
-          console.log('✅ Sesión restaurada desde localStorage')
-        }
-      } catch (error) {
-        console.error('Error restaurando sesión:', error)
-        // Limpiar datos corruptos
-        localStorage.removeItem('userInfo')
-        localStorage.removeItem('sessionToken')
-      }
-    }
 
-    restoreSession()
-  }, [])
 
   const hasRole = (role) => {
     return user && user.rol === role
@@ -199,9 +182,9 @@ export const AuthProvider = ({ children }) => {
     user,
     loading,
     isAuthenticated,
+    initializing,
     login,
     logout,
-    checkSession,
     getUserInfo,
     checkIsAuthenticated,
     hasRole,

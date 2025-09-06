@@ -2,7 +2,9 @@ import { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { useNavigate, useLocation } from 'react-router-dom'
 import LoadingSpinner from './LoadingSpinner'
-import ThemeToggle from './ThemeToggle'
+import { institucionService } from '../services/institucionService'
+import quizService from '../services/quizService'
+import { supabase } from '../lib/supabaseConfig'
 
 const QuizResult = () => {
   const { user, logout, getUserInfo } = useAuth()
@@ -14,11 +16,30 @@ const QuizResult = () => {
   const [score, setScore] = useState(0)
   const [totalQuestions, setTotalQuestions] = useState(0)
   const [correctAnswers, setCorrectAnswers] = useState(0)
+  const [informacionInstitucional, setInformacionInstitucional] = useState(null)
+  const [quizConfig, setQuizConfig] = useState(null)
+  const [intentosUsados, setIntentosUsados] = useState(0)
+
+  // Paleta de colores del sistema
+  const colors = {
+    primary: '#4d3930',
+    secondary: '#f4b100',
+    accent: '#b47b21',
+    white: '#ffffff'
+  }
 
   useEffect(() => {
     loadUserInfo()
     loadQuizData()
+    loadInformacionInstitucional()
+    loadQuizConfig()
   }, [])
+
+  useEffect(() => {
+    if (userInfo?.identificacion) {
+      loadIntentosUsados().then(count => setIntentosUsados(count));
+    }
+  }, [userInfo?.identificacion])
 
   const loadUserInfo = async () => {
     try {
@@ -63,6 +84,50 @@ const QuizResult = () => {
     setScore(Math.round((correct / total) * 100))
   }
 
+  const loadInformacionInstitucional = async () => {
+    try {
+      const info = await institucionService.getInformacionActiva();
+      setInformacionInstitucional(info);
+    } catch (error) {
+      console.error('Error cargando información institucional:', error);
+      // Usar información por defecto si hay error
+      setInformacionInstitucional(institucionService.getInformacionPorDefecto());
+    }
+  };
+
+  const loadQuizConfig = async () => {
+    try {
+      const config = await quizService.getQuizConfig();
+      setQuizConfig(config);
+    } catch (error) {
+      console.error('Error cargando configuración del quiz:', error);
+      // Usar configuración por defecto si hay error
+      setQuizConfig({
+        intentos_permitidos: 1
+      });
+    }
+  };
+
+  const loadIntentosUsados = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('intentos_quiz')
+        .select('id')
+        .eq('estudiante_id', userInfo.identificacion)
+        .not('fecha_fin', 'is', null); // Solo intentos completados
+
+      if (error) {
+        console.error('Error cargando intentos usados:', error);
+        return 0;
+      }
+
+      return data.length;
+    } catch (error) {
+      console.error('Error en loadIntentosUsados:', error);
+      return 0;
+    }
+  };
+
   const handleLogout = async () => {
     await logout()
     navigate('/login')
@@ -72,23 +137,23 @@ const QuizResult = () => {
     navigate('/estudiante/dashboard')
   }
 
+  const oportunidadesDisponibles = quizConfig ? (quizConfig.intentos_permitidos - intentosUsados) : 0
+  const seAgotaronIntentos = oportunidadesDisponibles <= 0
+
   const getScoreColor = () => {
-    if (score >= 80) return 'text-green-400'
-    if (score >= 60) return 'text-yellow-400'
+    if (score >= 70) return 'text-green-400'
     return 'text-red-400'
   }
 
   const getScoreMessage = () => {
     if (score >= 90) return '¡Excelente! Has demostrado un dominio excepcional del tema.'
     if (score >= 80) return '¡Muy bien! Has mostrado un buen conocimiento del material.'
-    if (score >= 70) return 'Bien hecho. Has alcanzado un nivel satisfactorio.'
-    if (score >= 60) return 'Aprobado. Considera revisar algunos conceptos.'
-    return 'Necesitas mejorar. Te recomendamos estudiar más el material.'
+    if (score >= 70) return '¡Aprobado! Has alcanzado el nivel mínimo requerido para la admisión.'
+    return 'No aprobado. Necesitas obtener al menos 70 puntos para ser admitido. Te recomendamos estudiar más el material.'
   }
 
   const getScoreEmoji = () => {
-    if (score >= 80) return '🎉'
-    if (score >= 60) return '👍'
+    if (score >= 70) return '🎉'
     return '📚'
   }
 
@@ -98,7 +163,7 @@ const QuizResult = () => {
 
   if (!userInfo || !quizData) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center" style={{ background: `linear-gradient(to bottom right, ${colors.primary}, ${colors.accent}, ${colors.primary})` }}>
         <div className="alert alert-error">
           <span>Error cargando resultados del quiz</span>
         </div>
@@ -107,138 +172,127 @@ const QuizResult = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900">
+    <div className="min-h-screen" style={{ background: `linear-gradient(to bottom right, ${colors.primary}, ${colors.accent}, ${colors.primary})` }}>
       
       {/* Header */}
-      <div className="bg-white/10 backdrop-blur-xl border-b border-white/20">
-        <div className="navbar">
+      <div style={{ backgroundColor: colors.primary + '20', backdropFilter: 'blur(10px)', borderBottom: '1px solid ' + colors.accent + '40' }}>
+        <div className="navbar py-2">
           <div className="flex-1">
-            <h1 className="text-xl font-bold text-white">🎓 Centro Educativo</h1>
+            <h1 className="text-lg font-bold" style={{ color: colors.white }}>
+              🎓 {informacionInstitucional?.nombre_centro_educativo || 'Centro Educativo'} | {informacionInstitucional?.nombre_especialidad || 'Secretariado Ejecutivo'}
+            </h1>
           </div>
-          <div className="flex-none gap-2">
-            <ThemeToggle />
-            <div className="dropdown dropdown-end">
-              <div tabIndex={0} role="button" className="btn btn-ghost btn-circle avatar bg-white/20 hover:bg-white/30">
-                <div className="w-10 rounded-full bg-blue-600 text-white flex items-center justify-center">
-                  <span className="text-lg font-bold">
-                    {userInfo.nombre.charAt(0)}{userInfo.primer_apellido.charAt(0)}
-                  </span>
-                </div>
-              </div>
-              <ul tabIndex={0} className="mt-3 z-[1] menu menu-sm dropdown-content bg-white/90 backdrop-blur-xl rounded-box w-52 shadow-xl border border-white/20">
-                <li><button onClick={handleLogout} className="text-red-600">Cerrar Sesión</button></li>
-              </ul>
+          <div className="flex-none">
+            <div className="w-8 rounded-full text-white flex items-center justify-center" style={{ backgroundColor: colors.accent }}>
+              <span className="text-sm font-bold">
+                {userInfo.nombre.charAt(0)}{userInfo.primer_apellido.charAt(0)}
+              </span>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Contenido Principal */}
-      <div className="container mx-auto px-4 py-8">
+      {/* Contenido Principal optimizado para pantallas pequeñas */}
+      <div className="pt-28 px-4 pb-4">
         <div className="max-w-4xl mx-auto">
           
-          {/* Tarjeta de Resultados */}
-          <div className="card bg-white/10 backdrop-blur-xl border border-white/20 shadow-2xl mb-8">
-            <div className="card-body text-center">
+          {/* Tarjeta de Resultados Compacta */}
+          <div className="card shadow-2xl mb-4" style={{ backgroundColor: colors.white + '10', backdropFilter: 'blur(10px)', border: '1px solid ' + colors.accent + '40' }}>
+            <div className="card-body p-4 text-center">
               
-              {/* Logo del Centro Educativo */}
-              <div className="mb-6">
-                <img
-                  src="/img/ico/admision2025.png"
-                  alt="Logo Centro Educativo"
-                  className="w-24 h-24 mx-auto mb-4"
-                />
-                <h2 className="text-3xl font-bold text-white mb-2">Resultados del Quiz</h2>
-                <p className="text-blue-200">Evaluación de Conocimientos 2025</p>
+              {/* Título */}
+              <div className="mb-4">
+                <h2 className="text-2xl font-bold mb-1" style={{ color: colors.white }}>Resultados de la Prueba</h2>
+                <p className="text-sm" style={{ color: colors.secondary }}>Evaluación de Conocimientos, Secretariado Ejecutivo</p>
               </div>
 
-              {/* Información del Estudiante */}
-              <div className="bg-white/5 backdrop-blur-sm rounded-xl p-6 mb-8 border border-white/10">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-white">
+              {/* Información del Estudiante Compacta */}
+              <div className="rounded-xl p-3 mb-4" style={{ backgroundColor: colors.white + '05', backdropFilter: 'blur(10px)', border: '1px solid ' + colors.white + '10' }}>
+                <div className="grid grid-cols-2 gap-2">
                   <div className="text-center">
-                    <p className="text-sm text-blue-200">Estudiante</p>
-                    <p className="font-semibold text-lg">{userInfo.nombre} {userInfo.primer_apellido}</p>
+                    <p className="text-xs" style={{ color: colors.secondary }}>Estudiante</p>
+                    <p className="font-semibold text-sm" style={{ color: colors.white }}>{userInfo.nombre} {userInfo.primer_apellido}</p>
                   </div>
                   <div className="text-center">
-                    <p className="text-sm text-blue-200">Identificación</p>
-                    <p className="font-semibold text-lg">{userInfo.identificacion}</p>
+                    <p className="text-xs" style={{ color: colors.secondary }}>Identificación</p>
+                    <p className="font-semibold text-sm" style={{ color: colors.white }}>{userInfo.identificacion}</p>
                   </div>
                 </div>
               </div>
 
-              {/* Puntuación */}
-              <div className="mb-8">
-                <div className={`text-8xl font-bold mb-4 ${getScoreColor()}`}>
+              {/* Puntuación Compacta */}
+              <div className="mb-4">
+                <div className="text-4xl font-bold mb-2" style={{ color: score >= 70 ? colors.secondary : colors.accent }}>
                   {getScoreEmoji()}
                 </div>
-                <div className={`text-6xl font-bold mb-4 ${getScoreColor()}`}>
+                <div className="text-3xl font-bold mb-2 p-2 rounded-lg" style={{ 
+                  color: colors.white,
+                  backgroundColor: score >= 70 ? colors.secondary + '30' : colors.accent + '30',
+                  border: '2px solid ' + (score >= 70 ? colors.secondary : colors.accent)
+                }}>
                   {score}%
                 </div>
-                <p className="text-white text-lg mb-2">
+                <p className="text-sm mb-1" style={{ color: colors.white }}>
                   {correctAnswers} de {totalQuestions} preguntas correctas
                 </p>
-                <p className="text-blue-200 text-base">
+                <p className="text-xs" style={{ color: colors.secondary }}>
                   {getScoreMessage()}
                 </p>
               </div>
 
-              {/* Detalles del Quiz */}
-              <div className="bg-white/5 backdrop-blur-sm rounded-xl p-6 mb-8 border border-white/10">
-                <h3 className="text-xl font-bold text-white mb-4">Detalles del Quiz</h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
-                  <div>
-                    <p className="text-2xl font-bold text-blue-400">{totalQuestions}</p>
-                    <p className="text-sm text-blue-200">Total Preguntas</p>
+              {/* Detalles del Quiz Compactos */}
+              <div className="rounded-xl p-3 mb-4" style={{ backgroundColor: colors.white + '05', backdropFilter: 'blur(10px)', border: '1px solid ' + colors.white + '10' }}>
+                <h3 className="text-lg font-bold mb-2" style={{ color: colors.white }}>Detalles de la Prueba</h3>
+                <div className="grid grid-cols-3 gap-2 text-center">
+                  <div className="p-2 rounded-lg" style={{ backgroundColor: colors.accent + '20', border: '1px solid ' + colors.accent + '40' }}>
+                    <p className="text-lg font-bold" style={{ color: colors.white }}>{totalQuestions}</p>
+                    <p className="text-xs" style={{ color: colors.secondary }}>Total Preguntas</p>
                   </div>
-                  <div>
-                    <p className="text-2xl font-bold text-green-400">{correctAnswers}</p>
-                    <p className="text-sm text-blue-200">Correctas</p>
+                  <div className="p-2 rounded-lg" style={{ backgroundColor: colors.secondary + '20', border: '1px solid ' + colors.secondary + '40' }}>
+                    <p className="text-lg font-bold" style={{ color: colors.white }}>{correctAnswers}</p>
+                    <p className="text-xs" style={{ color: colors.secondary }}>Correctas</p>
                   </div>
-                  <div>
-                    <p className="text-2xl font-bold text-red-400">{totalQuestions - correctAnswers}</p>
-                    <p className="text-sm text-blue-200">Incorrectas</p>
+                  <div className="p-2 rounded-lg" style={{ backgroundColor: colors.accent + '20', border: '1px solid ' + colors.accent + '40' }}>
+                    <p className="text-lg font-bold" style={{ color: colors.white }}>{totalQuestions - correctAnswers}</p>
+                    <p className="text-xs" style={{ color: colors.secondary }}>Incorrectas</p>
                   </div>
                 </div>
               </div>
 
-              {/* Mensaje de Estado */}
-              <div className="bg-white/5 backdrop-blur-sm rounded-xl p-6 mb-8 border border-white/10">
+              {/* Mensaje de Estado Compacto */}
+              <div className="rounded-xl p-3 mb-4" style={{ backgroundColor: colors.white + '05', backdropFilter: 'blur(10px)', border: '1px solid ' + colors.white + '10' }}>
                 <div className="text-center">
-                  {score >= 60 ? (
-                    <div className="text-green-400">
-                      <p className="text-2xl font-bold mb-2">✅ ¡APROBADO!</p>
-                      <p className="text-white">Has completado exitosamente la evaluación de admisión.</p>
+                  {score >= 70 ? (
+                    <div style={{ color: colors.secondary }}>
+                      <p className="text-lg font-bold mb-1">✅ ¡APROBADO!</p>
+                      <p className="text-xs" style={{ color: colors.white }}>Has completado exitosamente la evaluación de admisión.</p>
                     </div>
                   ) : (
-                    <div className="text-red-400">
-                      <p className="text-2xl font-bold mb-2">❌ NO APROBADO</p>
-                      <p className="text-white">Necesitas mejorar tu puntuación para ser admitido.</p>
+                    <div style={{ color: colors.accent }}>
+                      <p className="text-lg font-bold mb-1">❌ NO APROBADO</p>
+                      <p className="text-xs" style={{ color: colors.white }}>Necesitas obtener al menos 70 puntos para ser admitido.</p>
                     </div>
                   )}
                 </div>
               </div>
 
-              {/* Botones de Acción */}
-              <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              {/* Botón de Acción */}
+              <div className="flex justify-center">
                 <button
                   onClick={handleReturnToDashboard}
-                  className="btn btn-primary bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 border-0"
+                  className="btn btn-lg border-0 font-bold px-8 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
+                  style={{ backgroundColor: colors.secondary, color: colors.white }}
                 >
                   🏠 Volver al Dashboard
                 </button>
-                <button
-                  onClick={handleLogout}
-                  className="btn btn-outline text-white border-white/30 hover:bg-white/20"
-                >
-                  🚪 Cerrar Sesión
-                </button>
               </div>
 
-              {/* Aviso Importante */}
-              <div className="mt-8 p-4 bg-yellow-500/20 border border-yellow-500/30 rounded-xl">
-                <p className="text-yellow-200 text-sm">
-                  <strong>⚠️ Importante:</strong> Este quiz solo puede realizarse una vez. 
-                  Los resultados han sido registrados en el sistema.
+              {/* Aviso Importante Compacto */}
+              <div className="mt-4 p-2 rounded-xl" style={{ backgroundColor: colors.secondary + '20', border: '1px solid ' + colors.secondary + '30' }}>
+                <p className="text-xs" style={{ color: colors.secondary }}>
+                  <strong>⚠️ Importante:</strong> Esta prueba solo puede realizarse {quizConfig?.intentos_permitidos || 1} {(quizConfig?.intentos_permitidos || 1) === 1 ? 'vez' : 'veces'}. 
+                  {seAgotaronIntentos ? 'Has agotado todas tus oportunidades.' : `Te quedan ${oportunidadesDisponibles} oportunidad${oportunidadesDisponibles === 1 ? '' : 'es'} disponible${oportunidadesDisponibles === 1 ? '' : 's'}.`}
+                  Los resultados han sido registrados en el sistema. Haz clic en "Volver al Dashboard" para continuar.
                 </p>
               </div>
             </div>

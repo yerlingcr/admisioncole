@@ -1,39 +1,104 @@
 import { supabase } from '../lib/supabaseConfig'
+import { configuracionService } from './configuracionService'
+import usuarioCategoriasService from './usuarioCategoriasService'
 
 class QuizService {
   // Obtener configuración del quiz
   async getQuizConfig() {
     try {
-      const { data, error } = await supabase
-        .from('configuracion_quiz')
-        .select('*')
-        .eq('activa', true)
-        .single()
-
-      if (error) throw error
-      return data
+      // Usar el nuevo servicio de configuración
+      const config = await configuracionService.getConfiguracionActiva()
+      return config
     } catch (error) {
       console.error('Error obteniendo configuración del quiz:', error)
-      throw error
+      // Retornar configuración por defecto si hay error
+      return configuracionService.getConfiguracionPorDefecto()
     }
   }
 
   // Obtener preguntas aleatorias para el quiz
-  async getQuizQuestions(totalQuestions = 5, categoria = null) {
+  async getQuizQuestions(totalQuestions = 5, categoria = null, usuarioId = null) {
     try {
-      // Usar la función personalizada de Supabase
-      const { data, error } = await supabase
-        .rpc('obtener_preguntas_quiz', {
-          p_total_preguntas: totalQuestions,
-          p_categoria: categoria
-        })
+      // Si se proporciona usuarioId, obtener sus categorías asignadas
+      let categoriasUsuario = []
+      if (usuarioId) {
+        categoriasUsuario = await usuarioCategoriasService.getCategoriasByUsuario(usuarioId)
+        console.log('Categorías asignadas al usuario:', categoriasUsuario)
+      }
 
-      if (error) throw error
-      return data
+      // Si el usuario tiene categorías asignadas, usar solo esas
+      // Si no tiene categorías asignadas, usar todas las categorías
+      if (categoriasUsuario.length > 0) {
+        return this.getQuizQuestionsByCategorias(totalQuestions, categoriasUsuario)
+      } else {
+        // Usar la función original si no hay categorías específicas
+        const { data, error } = await supabase
+          .rpc('obtener_preguntas_quiz', {
+            p_total_preguntas: totalQuestions,
+            p_categoria: categoria
+          })
+
+        if (error) throw error
+        return data
+      }
     } catch (error) {
       console.error('Error obteniendo preguntas del quiz:', error)
       // Fallback: obtener preguntas manualmente
       return this.getQuizQuestionsFallback(totalQuestions, categoria)
+    }
+  }
+
+  // Obtener preguntas de categorías específicas del usuario
+  async getQuizQuestionsByCategorias(totalQuestions, categoriasUsuario) {
+    try {
+      let query = supabase
+        .from('preguntas_quiz')
+        .select(`
+          id,
+          pregunta,
+          imagen_url,
+          categoria,
+          nivel_dificultad,
+          opciones_respuesta (
+            id,
+            texto_opcion,
+            es_correcta,
+            orden_mostrar
+          )
+        `)
+        .eq('activa', true)
+        .in('categoria', categoriasUsuario)
+
+      const { data, error } = await query
+
+      if (error) throw error
+
+      console.log('Preguntas encontradas para categorías del usuario:', data.length)
+
+      // Procesar las preguntas
+      const processedQuestions = data
+        .map(q => ({
+          id: q.id,
+          pregunta: q.pregunta,
+          imagen_url: q.imagen_url,
+          categoria: q.categoria,
+          nivel_dificultad: q.nivel_dificultad,
+          opciones: this.aleatorizarOpciones(q.opciones_respuesta.filter(o => o.activa !== false))
+        }))
+      
+      // Aleatorizar orden de preguntas usando Fisher-Yates
+      const preguntasAleatorias = this.aleatorizarArray(processedQuestions)
+      
+      // Tomar solo el número de preguntas solicitado
+      const preguntasSeleccionadas = preguntasAleatorias.slice(0, totalQuestions)
+
+      console.log('Preguntas procesadas para el usuario:', preguntasSeleccionadas.length)
+      console.log('🔀 Preguntas aleatorizadas:', preguntasSeleccionadas.map(p => p.id))
+      console.log('🔀 Opciones aleatorizadas en primera pregunta:', preguntasSeleccionadas[0]?.opciones?.map(o => ({ id: o.id, texto: o.texto_opcion.substring(0, 20) + '...' })))
+      return preguntasSeleccionadas
+    } catch (error) {
+      console.error('Error obteniendo preguntas por categorías:', error)
+      throw error
     }
   }
 
@@ -269,28 +334,22 @@ class QuizService {
     try {
       console.log('Iniciando verificación para estudiante:', estudianteId)
       
-      // Primero verificar que las tablas existan
+      // Verificar configuración del sistema
       try {
-        const { data: configData, error: configError } = await supabase
-          .from('configuracion_quiz')
-          .select('*')
-          .eq('activa', true)
-          .limit(1)
+        const config = await configuracionService.getConfiguracionActiva()
+        console.log('Configuración encontrada:', config)
         
-        if (configError) {
-          console.error('Error accediendo a configuracion_quiz:', configError)
+        if (!config) {
           return {
             canTake: false,
-            reason: 'Error de configuración del sistema'
+            reason: 'No hay configuración activa del sistema'
           }
         }
-        
-        console.log('Configuración encontrada:', configData)
-      } catch (tableError) {
-        console.error('Error verificando tablas:', tableError)
+      } catch (configError) {
+        console.error('Error verificando configuración:', configError)
         return {
           canTake: false,
-          reason: 'Sistema de quiz no disponible'
+          reason: 'Error de configuración del sistema'
         }
       }
 
@@ -315,6 +374,102 @@ class QuizService {
     } catch (error) {
       console.error('Error verificando si el estudiante puede realizar el quiz:', error)
       throw error
+    }
+  }
+
+  // Función para aleatorizar arrays usando algoritmo Fisher-Yates
+  aleatorizarArray(array) {
+    if (!array || array.length === 0) return []
+    
+    // Crear una copia del array para no modificar el original
+    const arrayAleatorio = [...array]
+    
+    // Algoritmo Fisher-Yates para aleatorización más robusta
+    for (let i = arrayAleatorio.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1))
+      ;[arrayAleatorio[i], arrayAleatorio[j]] = [arrayAleatorio[j], arrayAleatorio[i]]
+    }
+    
+    return arrayAleatorio
+  }
+
+  // Función para aleatorizar las opciones de respuesta
+  aleatorizarOpciones(opciones) {
+    if (!opciones || opciones.length === 0) return []
+    
+    // Usar la función aleatorizarArray para las opciones
+    const opcionesAleatorias = this.aleatorizarArray(opciones)
+    
+    // Mapear a la estructura esperada
+    return opcionesAleatorias.map(o => ({
+      id: o.id.toString(),
+      texto_opcion: o.texto_opcion,
+      es_correcta: o.es_correcta
+    }))
+  }
+
+  // Función para resetear oportunidades de un estudiante
+  async resetearOportunidadesEstudiante(estudianteId) {
+    try {
+      console.log('🔄 Reseteando oportunidades para estudiante:', estudianteId)
+      
+      // 1. Primero obtener todos los intentos del estudiante para eliminar sus respuestas
+      const { data: intentos, error: errorIntentos } = await supabase
+        .from('intentos_quiz')
+        .select('id, fecha_fin, estado')
+        .eq('estudiante_id', estudianteId)
+
+      if (errorIntentos) {
+        console.error('Error obteniendo intentos:', errorIntentos)
+        throw errorIntentos
+      }
+
+      console.log('📊 Intentos encontrados para eliminar:', intentos)
+      console.log('📊 Cantidad de intentos a eliminar:', intentos?.length || 0)
+
+      // 2. Eliminar todas las respuestas relacionadas con estos intentos
+      if (intentos && intentos.length > 0) {
+        const intentoIds = intentos.map(intento => intento.id)
+        
+        const { error: errorRespuestas } = await supabase
+          .from('respuestas_estudiante')
+          .delete()
+          .in('intento_id', intentoIds)
+
+        if (errorRespuestas) {
+          console.error('Error eliminando respuestas:', errorRespuestas)
+          throw errorRespuestas
+        }
+      }
+
+      // 3. Eliminar todos los intentos del estudiante
+      const { error: errorEliminarIntentos } = await supabase
+        .from('intentos_quiz')
+        .delete()
+        .eq('estudiante_id', estudianteId)
+
+      if (errorEliminarIntentos) {
+        console.error('Error eliminando intentos:', errorEliminarIntentos)
+        throw errorEliminarIntentos
+      }
+
+      // 4. Verificar que se eliminaron todos los intentos
+      const { data: intentosRestantes, error: errorVerificacion } = await supabase
+        .from('intentos_quiz')
+        .select('id')
+        .eq('estudiante_id', estudianteId)
+
+      if (errorVerificacion) {
+        console.error('Error verificando eliminación:', errorVerificacion)
+      } else {
+        console.log('📊 Intentos restantes después del reset:', intentosRestantes?.length || 0)
+      }
+
+      console.log('✅ Oportunidades reseteadas correctamente para:', estudianteId)
+      return { success: true }
+    } catch (error) {
+      console.error('❌ Error reseteando oportunidades:', error)
+      return { success: false, error: error.message }
     }
   }
 }

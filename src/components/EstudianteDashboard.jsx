@@ -1,18 +1,32 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import LoadingSpinner from './LoadingSpinner'
-import ThemeToggle from './ThemeToggle'
 import quizService from '../services/quizService'
+import { institucionService } from '../services/institucionService'
+import { supabase } from '../lib/supabaseConfig'
 
 const EstudianteDashboard = () => {
   const { user, logout, getUserInfo } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
   const [userInfo, setUserInfo] = useState(null)
   const [loading, setLoading] = useState(true)
   const [quizStatus, setQuizStatus] = useState(null)
   const [quizStatusLoading, setQuizStatusLoading] = useState(false)
   const [showInstructions, setShowInstructions] = useState(false)
+  const [quizConfig, setQuizConfig] = useState(null)
+  const [informacionInstitucional, setInformacionInstitucional] = useState(null)
+  const [intentosUsados, setIntentosUsados] = useState(0)
+  const [intentosCompletados, setIntentosCompletados] = useState([])
+
+  // Paleta de colores del sistema
+  const colors = {
+    primary: '#4d3930',
+    secondary: '#f4b100',
+    accent: '#b47b21',
+    white: '#ffffff'
+  }
 
   useEffect(() => {
     loadUserInfo()
@@ -20,9 +34,33 @@ const EstudianteDashboard = () => {
 
   useEffect(() => {
     if (userInfo?.identificacion) {
+      console.log('🚀 Cargando datos iniciales para:', userInfo.identificacion);
       checkQuizStatus()
+      loadQuizConfig()
+      loadInformacionInstitucional()
+      loadIntentosUsados()
+    } else {
+      console.log('⏳ Esperando userInfo para cargar datos...');
     }
   }, [userInfo?.identificacion])
+
+  // Refrescar datos cuando regreses al dashboard (solo si viene de otra página)
+  useEffect(() => {
+    if (userInfo?.identificacion && location.pathname === '/estudiante/dashboard') {
+      // Solo refrescar si viene de una página diferente (no en carga inicial)
+      const isReturningFromAnotherPage = location.state?.from !== 'dashboard';
+      
+      if (isReturningFromAnotherPage) {
+        console.log('📍 Detectada navegación al dashboard, programando refresh suave...');
+        // Delay más corto y sin logs excesivos
+        const timer = setTimeout(() => {
+          refreshDashboardData();
+        }, 1000) // Reducido a 1 segundo
+        
+        return () => clearTimeout(timer)
+      }
+    }
+  }, [location.pathname, userInfo?.identificacion])
 
   const loadUserInfo = async () => {
     try {
@@ -62,10 +100,173 @@ const EstudianteDashboard = () => {
     }
   }
 
+  const loadQuizConfig = async () => {
+    try {
+      const config = await quizService.getQuizConfig()
+      setQuizConfig(config)
+    } catch (error) {
+      console.error('Error cargando configuración del quiz:', error)
+      // Usar configuración por defecto si hay error
+      setQuizConfig({
+        tiempo_limite_minutos: 5,
+        numero_preguntas: 5,
+        puntaje_minimo_aprobacion: 70,
+        intentos_permitidos: 2
+      })
+    }
+  }
+
+  const loadInformacionInstitucional = async () => {
+    try {
+      const info = await institucionService.getInformacionActiva();
+      setInformacionInstitucional(info);
+    } catch (error) {
+      console.error('Error cargando información institucional:', error);
+      // Usar información por defecto si hay error
+      setInformacionInstitucional(institucionService.getInformacionPorDefecto());
+    }
+  };
+
+  const loadIntentosUsados = async () => {
+    try {
+      if (!userInfo?.identificacion) {
+        console.log('⚠️ No hay identificacion del usuario para cargar intentos');
+        return;
+      }
+
+      console.log('🔍 Buscando intentos para:', userInfo.identificacion);
+      
+      // Consulta directa y simple
+      const { data, error } = await supabase
+        .from('intentos_quiz')
+        .select('id, estudiante_id, fecha_inicio, fecha_fin, puntuacion_total')
+        .eq('estudiante_id', userInfo.identificacion)
+        .not('fecha_fin', 'is', null);
+
+      if (error) {
+        console.error('❌ Error cargando intentos:', error);
+        console.error('❌ Detalles del error:', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint
+        });
+        setIntentosUsados(0);
+        setIntentosCompletados([]);
+        return;
+      }
+
+      console.log('📊 Intentos encontrados en BD:', data);
+      console.log('📊 Cantidad de intentos:', data.length);
+      
+      // Ordenar por fecha_inicio (más recientes primero)
+      const sortedData = data.sort((a, b) => new Date(b.fecha_inicio) - new Date(a.fecha_inicio));
+      
+      // Verificar que cada intento tenga puntuacion_total
+      sortedData.forEach((intento, index) => {
+        console.log(`📊 Intento ${index + 1}:`, {
+          id: intento.id,
+          fecha_inicio: intento.fecha_inicio,
+          fecha_fin: intento.fecha_fin,
+          puntuacion_total: intento.puntuacion_total
+        });
+      });
+      
+      setIntentosUsados(sortedData.length);
+      setIntentosCompletados(sortedData);
+      
+      console.log('✅ Estado actualizado - intentosUsados:', sortedData.length);
+    } catch (error) {
+      console.error('❌ Error en loadIntentosUsados:', error);
+      setIntentosUsados(0);
+      setIntentosCompletados([]);
+    }
+  };
+
   const handleStartQuiz = () => {
     // Navegar al quiz
     navigate('/estudiante/quiz')
   }
+
+  const refreshDashboardData = async () => {
+    if (userInfo?.identificacion) {
+      try {
+        // Actualización silenciosa sin logs excesivos
+        await Promise.all([
+          checkQuizStatus(),
+          loadIntentosUsados(),
+          loadQuizConfig(),
+          loadInformacionInstitucional()
+        ]);
+      } catch (error) {
+        console.error('❌ Error refrescando datos del dashboard:', error);
+      }
+    }
+  }
+
+
+  const testDatabaseConnection = async () => {
+    if (!userInfo?.identificacion) {
+      console.log('⚠️ No hay userInfo para probar conexión');
+      return;
+    }
+
+    console.log('🧪 Probando conexión directa a la base de datos...');
+    
+    try {
+      // Consulta directa sin filtros
+      const { data: allData, error: allError } = await supabase
+        .from('intentos_quiz')
+        .select('*')
+        .eq('estudiante_id', userInfo.identificacion);
+
+      if (allError) {
+        console.error('❌ Error en consulta general:', allError);
+        return;
+      }
+
+      console.log('📊 Todos los intentos en BD:', allData);
+      console.log('📊 Cantidad total de intentos:', allData.length);
+      
+      // Mostrar detalles de cada intento
+      allData.forEach((intento, index) => {
+        console.log(`📊 Intento ${index + 1}:`, {
+          id: intento.id,
+          estudiante_id: intento.estudiante_id,
+          fecha_inicio: intento.fecha_inicio,
+          fecha_fin: intento.fecha_fin,
+          puntuacion_total: intento.puntuacion_total,
+          tiene_fecha_fin: !!intento.fecha_fin,
+          es_completado: intento.fecha_fin !== null
+        });
+      });
+      
+      // Consulta solo completados
+      const { data: completedData, error: completedError } = await supabase
+        .from('intentos_quiz')
+        .select('id, estudiante_id, fecha_inicio, fecha_fin, puntuacion_total')
+        .eq('estudiante_id', userInfo.identificacion)
+        .not('fecha_fin', 'is', null);
+
+      if (completedError) {
+        console.error('❌ Error en consulta completados:', completedError);
+        return;
+      }
+
+      console.log('✅ Intentos completados en BD:', completedData);
+      console.log('📊 Cantidad de completados:', completedData.length);
+      
+      // Alert para mostrar resultados
+      alert(`Resultados de la verificación:\n\nTotal de intentos: ${allData.length}\nIntentos completados: ${completedData.length}\n\nRevisa la consola para más detalles.`);
+      
+    } catch (error) {
+      console.error('❌ Error en test de conexión:', error);
+    }
+  }
+
+  const oportunidadesDisponibles = quizConfig ? (quizConfig.intentos_permitidos - intentosUsados) : 0
+  const seAgotaronIntentos = oportunidadesDisponibles <= 0
+
+
 
   if (loading) {
     return <LoadingSpinner text="Cargando información..." />
@@ -73,7 +274,7 @@ const EstudianteDashboard = () => {
 
   if (!userInfo) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center" style={{ background: `linear-gradient(to bottom right, ${colors.primary}, ${colors.accent}, ${colors.primary})` }}>
         <div className="alert alert-error">
           <span>Error cargando información del usuario</span>
         </div>
@@ -82,33 +283,22 @@ const EstudianteDashboard = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900">
+    <div className="min-h-screen" style={{ background: `linear-gradient(to bottom right, ${colors.primary}, ${colors.accent}, ${colors.primary})` }}>
       
       {/* Header con navegación */}
-      <div className="navbar bg-white/10 backdrop-blur-xl border-b border-white/20">
-        <div className="flex-1">
-          <h1 className="text-xl font-bold text-white">🎓 Sistema de Admisión 2025</h1>
-        </div>
-        <div className="flex-none gap-2">
-          <ThemeToggle />
-          <div className="dropdown dropdown-end">
-            <div tabIndex={0} role="button" className="btn btn-ghost btn-circle avatar bg-white/20 hover:bg-white/30">
-              <div className="w-10 rounded-full bg-blue-600 text-white flex items-center justify-center">
-                <span className="text-lg font-bold">
-                  {userInfo.nombre.charAt(0)}{userInfo.primer_apellido.charAt(0)}
-                </span>
-              </div>
+      <div style={{ backgroundColor: colors.primary + '20', backdropFilter: 'blur(10px)', borderBottom: '1px solid ' + colors.accent + '40' }}>
+        <div className="navbar py-2">
+          <div className="flex-1">
+            <h1 className="text-lg font-bold" style={{ color: colors.white }}>
+              🎓 {informacionInstitucional?.nombre_centro_educativo || 'Centro Educativo'} | {informacionInstitucional?.nombre_especialidad || 'Secretariado Ejecutivo'}
+            </h1>
+          </div>
+          <div className="flex-none">
+            <div className="w-8 rounded-full text-white flex items-center justify-center" style={{ backgroundColor: colors.accent }}>
+              <span className="text-sm font-bold">
+                {userInfo.nombre.charAt(0)}{userInfo.primer_apellido.charAt(0)}
+              </span>
             </div>
-            <ul tabIndex={0} className="mt-3 z-[1] menu menu-sm dropdown-content bg-white/90 backdrop-blur-xl rounded-box w-52 shadow-xl border border-white/20">
-              <li>
-                <a className="justify-between text-gray-800">
-                  Perfil
-                  <span className="badge badge-primary">Estudiante</span>
-                </a>
-              </li>
-              <li><a className="text-gray-800">Configuración</a></li>
-              <li><button onClick={handleLogout} className="text-red-600">Cerrar Sesión</button></li>
-            </ul>
           </div>
         </div>
       </div>
@@ -119,40 +309,32 @@ const EstudianteDashboard = () => {
         {/* Pantalla de Bienvenida */}
         <div className="max-w-4xl mx-auto">
           
-          {/* Logo del Centro Educativo */}
+          {/* Título de la Evaluación */}
           <div className="text-center mb-8">
-            <img 
-              src="/img/ico/admision2025.png" 
-              alt="Logo Centro Educativo" 
-              className="w-32 h-32 mx-auto mb-6 drop-shadow-2xl"
-            />
-            <h1 className="text-4xl lg:text-5xl font-bold text-white mb-2 drop-shadow-2xl">
-              Bienvenido al Sistema de Admisión
-            </h1>
-            <p className="text-xl text-blue-200 drop-shadow-xl">
-              Evaluación de Conocimientos 2025
+            <p className="text-3xl font-bold text-white drop-shadow-2xl">
+              Evaluación de Conocimientos
             </p>
           </div>
 
           {/* Información del Estudiante */}
-          <div className="card bg-white/10 backdrop-blur-xl border border-white/20 shadow-2xl mb-8">
+          <div className="card shadow-2xl mb-8" style={{ backgroundColor: colors.white + '10', backdropFilter: 'blur(10px)', border: '1px solid ' + colors.accent + '40' }}>
             <div className="card-body text-center">
-              <h2 className="card-title text-2xl text-white justify-center mb-4">
+              <h2 className="card-title text-2xl justify-center mb-4" style={{ color: colors.white }}>
                 👤 Información del Estudiante
               </h2>
               
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-white">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-3">
                   <div className="flex justify-between items-center">
-                    <span className="font-semibold">Nombre Completo:</span>
-                    <span className="text-blue-200 font-medium">
+                    <span className="font-semibold" style={{ color: colors.white }}>Nombre Completo:</span>
+                    <span className="font-medium" style={{ color: colors.secondary }}>
                       {userInfo.nombre} {userInfo.primer_apellido} {userInfo.segundo_apellido}
                     </span>
                   </div>
                   
                   <div className="flex justify-between items-center">
-                    <span className="font-semibold">Identificación:</span>
-                    <span className="badge badge-primary text-lg px-4 py-2">
+                    <span className="font-semibold" style={{ color: colors.white }}>Identificación:</span>
+                    <span className="badge text-lg px-4 py-2" style={{ backgroundColor: colors.accent, color: colors.white }}>
                       {userInfo.identificacion}
                     </span>
                   </div>
@@ -160,16 +342,16 @@ const EstudianteDashboard = () => {
                 
                 <div className="space-y-3">
                   <div className="flex justify-between items-center">
-                    <span className="font-semibold">Estado:</span>
-                    <span className={`badge ${userInfo.estado === 'Activo' ? 'badge-success' : 'badge-error'} text-lg px-4 py-2`}>
-                      {userInfo.estado}
+                    <span className="font-semibold" style={{ color: colors.white }}>Oportunidades Disponibles:</span>
+                    <span className="badge text-lg px-4 py-2" style={{ backgroundColor: colors.secondary, color: colors.white }}>
+                      {quizConfig ? (quizConfig.intentos_permitidos - intentosUsados) : 'Cargando...'}
                     </span>
                   </div>
                   
                   <div className="flex justify-between items-center">
-                    <span className="font-semibold">Fecha de Registro:</span>
-                    <span className="text-blue-200">
-                      {new Date(userInfo.created_at).toLocaleDateString('es-ES')}
+                    <span className="font-semibold" style={{ color: colors.white }}>Intentos Realizados:</span>
+                    <span className="badge text-lg px-4 py-2" style={{ backgroundColor: colors.accent, color: colors.white }}>
+                      {intentosUsados}
                     </span>
                   </div>
                 </div>
@@ -178,63 +360,61 @@ const EstudianteDashboard = () => {
           </div>
 
           {/* Instrucciones de la Prueba */}
-          <div className="card bg-white/10 backdrop-blur-xl border border-white/20 shadow-2xl mb-8">
+          <div className="card shadow-2xl mb-8" style={{ backgroundColor: colors.white + '10', backdropFilter: 'blur(10px)', border: '1px solid ' + colors.accent + '40' }}>
             <div className="card-body">
-              <h2 className="card-title text-2xl text-white justify-center mb-6">
+              <h2 className="card-title text-2xl justify-center mb-6" style={{ color: colors.white }}>
                 📋 Instrucciones de la Prueba
               </h2>
               
-              <div className="space-y-4 text-white">
-                <div className="alert alert-info bg-blue-500/20 border-blue-400/30 text-blue-100">
-                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" className="stroke-current shrink-0 w-6 h-6">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                  </svg>
-                  <span className="font-semibold">Información General</span>
+              <div className="space-y-4">
+                <div className="alert p-3 rounded-lg" style={{ backgroundColor: colors.accent + '20', border: '1px solid ' + colors.accent + '40' }}>
+                  <span className="font-semibold" style={{ color: colors.white }}>Información General</span>
                 </div>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-3">
                     <div className="flex items-start space-x-3">
-                      <span className="text-blue-300 text-xl">⏱️</span>
+                      <span className="text-xl" style={{ color: colors.secondary }}>⏱️</span>
                       <div>
-                        <h4 className="font-semibold text-blue-200">Tiempo de la Prueba</h4>
-                        <p className="text-sm text-gray-300">Tendrás 60 minutos para completar la evaluación</p>
+                        <h4 className="font-semibold" style={{ color: colors.secondary }}>Tiempo de la Prueba</h4>
+                        <p className="text-sm" style={{ color: colors.white }}>
+                          {quizConfig ? `Tendrás ${quizConfig.tiempo_limite_minutos} minutos para completar la evaluación` : 'Cargando configuración...'}
+                        </p>
                       </div>
                     </div>
                     
                     <div className="flex items-start space-x-3">
-                      <span className="text-blue-300 text-xl">📝</span>
+                      <span className="text-xl" style={{ color: colors.secondary }}>📝</span>
                       <div>
-                        <h4 className="font-semibold text-blue-200">Tipo de Preguntas</h4>
-                        <p className="text-sm text-gray-300">Preguntas de opción múltiple y desarrollo</p>
+                        <h4 className="font-semibold" style={{ color: colors.secondary }}>Tipo de Preguntas</h4>
+                        <p className="text-sm" style={{ color: colors.white }}>Selección Única</p>
                       </div>
                     </div>
                   </div>
                   
                   <div className="space-y-3">
                     <div className="flex items-start space-x-3">
-                      <span className="text-blue-300 text-xl">📊</span>
+                      <span className="text-xl" style={{ color: colors.secondary }}>📊</span>
                       <div>
-                        <h4 className="font-semibold text-blue-200">Total de Preguntas</h4>
-                        <p className="text-sm text-gray-300">50 preguntas distribuidas en diferentes áreas</p>
+                        <h4 className="font-semibold" style={{ color: colors.secondary }}>Total de Preguntas</h4>
+                        <p className="text-sm" style={{ color: colors.white }}>
+                          {quizConfig ? `${quizConfig.numero_preguntas} preguntas distribuidas en diferentes áreas` : 'Cargando configuración...'}
+                        </p>
                       </div>
                     </div>
                     
                     <div className="flex items-start space-x-3">
-                      <span className="text-blue-300 text-xl">💾</span>
+                      <span className="text-xl" style={{ color: colors.secondary }}>💾</span>
                       <div>
-                        <h4 className="font-semibold text-blue-200">Guardado Automático</h4>
-                        <p className="text-sm text-gray-300">Tu progreso se guarda automáticamente</p>
+                        <h4 className="font-semibold" style={{ color: colors.secondary }}>Guardado Automático</h4>
+                        <p className="text-sm" style={{ color: colors.white }}>Tu progreso se guarda automáticamente</p>
                       </div>
                     </div>
                   </div>
                 </div>
                 
-                <div className="alert alert-warning bg-yellow-500/20 border-yellow-400/30 text-yellow-100 mt-6">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                  </svg>
-                  <span className="font-semibold">
+                <div className="alert p-3 rounded-lg mt-6" style={{ backgroundColor: colors.secondary + '20', border: '1px solid ' + colors.secondary + '40' }}>
+                  <span className="font-semibold" style={{ color: colors.secondary }}>
                     ⚠️ Importante: Una vez que inicies la prueba, el cronómetro comenzará y no se podrá pausar.
                   </span>
                 </div>
@@ -242,38 +422,109 @@ const EstudianteDashboard = () => {
             </div>
           </div>
 
+          {/* Historial de Intentos */}
+          {intentosCompletados.length > 0 && (
+            <div className="card shadow-2xl mb-8" style={{ backgroundColor: colors.white + '10', backdropFilter: 'blur(10px)', border: '1px solid ' + colors.accent + '40' }}>
+              <div className="card-body">
+                <h2 className="card-title text-2xl justify-center mb-6" style={{ color: colors.white }}>
+                  📊 Historial de Intentos
+                </h2>
+                
+                <div className="space-y-3">
+                  {intentosCompletados.map((intento, index) => (
+                    <div key={intento.id} className="flex justify-between items-center p-4 rounded-lg" style={{ backgroundColor: colors.white + '05', border: '1px solid ' + colors.white + '10' }}>
+                      <div className="flex items-center space-x-4">
+                        <span className="text-xl font-bold" style={{ color: colors.secondary }}>#{index + 1}</span>
+                        <div>
+                          <p className="text-sm font-semibold" style={{ color: colors.white }}>
+                            {new Date(intento.fecha_inicio).toLocaleDateString('es-ES')} - {new Date(intento.fecha_inicio).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
+                          </p>
+                          <p className="text-xs" style={{ color: colors.secondary }}>
+                            📅 {new Date(intento.fecha_fin).toLocaleDateString('es-ES')} - {new Date(intento.fecha_fin).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-center">
+                          <span className={`badge text-xl px-6 py-3 font-bold ${intento.puntuacion_total >= 70 ? 'badge-success' : 'badge-error'}`} style={{ 
+                            backgroundColor: intento.puntuacion_total >= 70 ? colors.secondary : colors.accent,
+                            color: colors.white
+                          }}>
+                            {intento.puntuacion_total || 0}%
+                          </span>
+                          <p className="text-xs mt-2 font-semibold" style={{ color: colors.secondary }}>
+                            {intento.puntuacion_total >= 70 ? '✅ Aprobado' : '❌ No Aprobado'}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+
+
+
+
                         {/* Botón para Empezar */}
               <div className="text-center">
                 {quizStatusLoading ? (
                   <LoadingSpinner text="Verificando estado del quiz..." />
                 ) : quizStatus ? (
-                  quizStatus.canTake ? (
+                  quizStatus.canTake && !seAgotaronIntentos ? (
                     <>
-                      <button
-                        onClick={handleStartQuiz}
-                        className="btn btn-primary btn-lg bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 border-0 text-white font-bold text-xl px-12 py-4 rounded-2xl shadow-2xl hover:shadow-3xl transition-all duration-300 transform hover:scale-105"
-                      >
-                        🚀 Empezar Prueba de Admisión
-                      </button>
+                      <div className="flex gap-4 justify-center">
+                        <button
+                          onClick={handleStartQuiz}
+                          className="btn btn-lg border-0 font-bold text-xl px-12 py-4 rounded-2xl shadow-2xl hover:shadow-3xl transition-all duration-300 transform hover:scale-105"
+                          style={{ backgroundColor: colors.secondary, color: colors.white }}
+                        >
+                          🚀 Empezar Prueba de Admisión
+                        </button>
+                        
+                        <button
+                          onClick={handleLogout}
+                          className="btn btn-lg border-0 font-bold text-xl px-8 py-4 rounded-2xl shadow-2xl hover:shadow-3xl transition-all duration-300 transform hover:scale-105"
+                          style={{ backgroundColor: colors.accent, color: colors.white }}
+                        >
+                          🚪 Cerrar Sesión
+                        </button>
+                      </div>
                       
-                      <p className="text-blue-200 mt-4 text-sm">
+                      <p className="mt-4 text-sm" style={{ color: colors.secondary }}>
                         Haz clic en el botón cuando estés listo para comenzar
                       </p>
                     </>
+                  ) : seAgotaronIntentos ? (
+                    <>
+                      <button
+                        onClick={handleLogout}
+                        className="btn btn-lg border-0 font-bold text-xl px-12 py-4 rounded-2xl shadow-2xl hover:shadow-3xl transition-all duration-300 transform hover:scale-105"
+                        style={{ backgroundColor: colors.accent, color: colors.white }}
+                      >
+                        🚪 Salir
+                      </button>
+                      
+                      <p className="mt-4 text-sm" style={{ color: colors.secondary }}>
+                        Has agotado todas tus oportunidades para realizar la prueba
+                      </p>
+                    </>
                   ) : (
-                    <div className="alert alert-warning bg-yellow-500/20 border-yellow-500/30 text-yellow-200 max-w-md mx-auto">
-                      <span>⚠️ {quizStatus.reason}</span>
+                    <div className="alert p-3 rounded-lg max-w-md mx-auto" style={{ backgroundColor: colors.accent + '20', border: '1px solid ' + colors.accent + '40' }}>
+                      <span style={{ color: colors.accent }}>⚠️ {quizStatus.reason}</span>
                     </div>
                   )
                 ) : (
-                  <div className="text-blue-200 text-sm">
+                  <div className="text-sm" style={{ color: colors.secondary }}>
                     Preparando sistema de quiz...
                   </div>
                 )}
               </div>
 
           {/* Información Adicional */}
-          <div className="mt-12 text-center text-blue-200 text-sm">
+          <div className="mt-12 text-center text-sm" style={{ color: colors.secondary }}>
             <p>¿Tienes dudas? Contacta al administrador del sistema</p>
             <p className="mt-2">© 2025 Sistema de Admisión - Desarrollado por Arakary Solutions</p>
           </div>

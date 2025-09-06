@@ -79,9 +79,9 @@ const Login = () => {
               <div className="text-center relative z-10">
                 <div className="mb-4 lg:mb-8">
                   <img 
-                    src="/img/ico/admision2025.png" 
-                    alt="Ícono Admisión 2025" 
-                    className="w-16 h-16 lg:w-24 lg:h-24 mx-auto mb-2 lg:mb-4 drop-shadow-2xl"
+                    src="/img/bg/escudovok.png" 
+                    alt="Escudo Vocacional" 
+                    className="w-48 h-48 lg:w-64 lg:h-64 mx-auto mb-0 drop-shadow-2xl object-contain"
                   />
                   <h1 className="text-2xl lg:text-4xl font-bold mb-2 drop-shadow-2xl text-white">Admisión 2025</h1>
                   <p className="hidden lg:block text-white text-lg drop-shadow-xl font-semibold">Sistema de Gestión Académica</p>
@@ -91,12 +91,7 @@ const Login = () => {
               {/* Ilustración Central - Solo visible en desktop */}
               <div className="hidden lg:flex flex-1 items-center justify-center relative z-10">
                 <div className="text-center">
-                  <img 
-                    src="/img/bg/logosecre.png" 
-                    alt="Logo Secretaría" 
-                    className="w-80 h-32 mb-4 drop-shadow-2xl"
-                  />
-                  <h2 className="text-2xl font-semibold mb-2 drop-shadow-2xl text-white">Bienvenido</h2>
+                  <h2 className="text-2xl font-semibold mb-2 drop-shadow-2xl text-white">Bienvenidos</h2>
                   <p className="text-white drop-shadow-xl font-medium">Accede a tu portal académico</p>
                 </div>
               </div>

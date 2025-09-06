@@ -3,12 +3,12 @@ import { useAuth } from '../contexts/AuthContext'
 import LoadingSpinner from './LoadingSpinner'
 
 const ProtectedRoute = ({ children, requiredRoles = [], redirectTo = '/login' }) => {
-  const { user, loading, isAuthenticated } = useAuth()
+  const { user, loading, isAuthenticated, initializing } = useAuth()
   const location = useLocation()
 
-  // Mostrar spinner mientras se verifica la autenticación
-  if (loading) {
-    return <LoadingSpinner text="Verificando autenticación..." />
+  // Mostrar spinner mientras se inicializa la app o se verifica la autenticación
+  if (initializing || loading) {
+    return <LoadingSpinner text={initializing ? "Inicializando aplicación..." : "Verificando autenticación..."} />
   }
 
   // Si no está autenticado, redirigir al login
