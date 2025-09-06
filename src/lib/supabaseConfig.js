@@ -4,6 +4,8 @@ const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 
 // Verificar que las variables de entorno estén configuradas
+let supabaseClient
+
 if (!supabaseUrl || !supabaseAnonKey) {
   console.error('❌ Variables de entorno de Supabase no configuradas')
   console.error('Para desarrollo local:')
@@ -15,13 +17,15 @@ if (!supabaseUrl || !supabaseAnonKey) {
   console.error('2. Agrega VITE_SUPABASE_URL y VITE_SUPABASE_ANON_KEY')
   
   // Crear un cliente con valores por defecto para evitar errores
-  export const supabase = createClient(
+  supabaseClient = createClient(
     'https://placeholder.supabase.co', 
     'placeholder-key'
   )
 } else {
-  export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+  supabaseClient = createClient(supabaseUrl, supabaseAnonKey)
 }
+
+export const supabase = supabaseClient
 
 // Funciones útiles para Supabase
 export const supabaseHelpers = {
