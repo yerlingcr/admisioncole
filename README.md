@@ -129,13 +129,33 @@ El sistema utiliza una paleta de colores consistente:
 
 3. **Configurar variables de entorno**
    ```bash
-   cp env.local.example env.local
+   cp env.example .env.local
    ```
-   Editar `env.local` con tus credenciales de Supabase:
+   Editar `.env.local` con tus credenciales de Supabase:
    ```
    VITE_SUPABASE_URL=tu_supabase_url
    VITE_SUPABASE_ANON_KEY=tu_supabase_anon_key
    ```
+
+### 🚀 Despliegue en Vercel
+
+1. **Conectar repositorio a Vercel**
+   - Ve a [vercel.com](https://vercel.com)
+   - Importa el repositorio `yerlingcr/admision2025`
+
+2. **Configurar variables de entorno en Vercel**
+   - En el dashboard de Vercel, ve a tu proyecto
+   - Settings → Environment Variables
+   - Agrega las siguientes variables:
+     ```
+     VITE_SUPABASE_URL = https://tu-proyecto.supabase.co
+     VITE_SUPABASE_ANON_KEY = tu_clave_anonima_de_supabase
+     ```
+
+3. **Hacer deploy**
+   - Vercel detectará automáticamente que es un proyecto Vite
+   - El deploy se realizará automáticamente
+   - Si las variables no están configuradas, verás una pantalla de configuración
 
 4. **Configurar la base de datos**
    - Ejecutar `database_setup.sql` en tu instancia de Supabase
