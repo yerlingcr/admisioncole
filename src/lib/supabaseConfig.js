@@ -3,26 +3,17 @@ import { createClient } from '@supabase/supabase-js'
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 
-// Verificar que las variables de entorno estén configuradas
+// Crear cliente de Supabase
 let supabaseClient
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.error('❌ Variables de entorno de Supabase no configuradas')
-  console.error('Para desarrollo local:')
-  console.error('1. Copia env.example a .env.local')
-  console.error('2. Configura tus credenciales de Supabase')
-  console.error('')
-  console.error('Para producción en Vercel:')
-  console.error('1. Ve a Dashboard de Vercel > Tu Proyecto > Settings > Environment Variables')
-  console.error('2. Agrega VITE_SUPABASE_URL y VITE_SUPABASE_ANON_KEY')
-  
-  // Crear un cliente con valores por defecto para evitar errores
+if (supabaseUrl && supabaseAnonKey) {
+  supabaseClient = createClient(supabaseUrl, supabaseAnonKey)
+} else {
+  // Para desarrollo sin variables configuradas
   supabaseClient = createClient(
     'https://placeholder.supabase.co', 
     'placeholder-key'
   )
-} else {
-  supabaseClient = createClient(supabaseUrl, supabaseAnonKey)
 }
 
 export const supabase = supabaseClient
