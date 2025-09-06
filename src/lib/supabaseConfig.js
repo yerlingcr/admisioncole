@@ -8,8 +8,8 @@ let supabaseClient
 
 // Usar valores por defecto para evitar problemas de deploy
 supabaseClient = createClient(
-  supabaseUrl || 'https://placeholder.supabase.co', 
-  supabaseAnonKey || 'placeholder-key'
+  'https://placeholder.supabase.co', 
+  'placeholder-key'
 )
 
 export const supabase = supabaseClient
