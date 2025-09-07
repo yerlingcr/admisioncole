@@ -36,6 +36,7 @@ const GestionPreguntas = () => {
   const fileInputRef = useRef(null)
   const dropZoneRef = useRef(null)
   const [categoriasDisponibles, setCategoriasDisponibles] = useState([])
+  const [categoriaFiltro, setCategoriaFiltro] = useState('')
 
   const niveles = ['Fácil', 'Medio', 'Difícil']
 
@@ -48,11 +49,16 @@ const GestionPreguntas = () => {
   const loadCategorias = async () => {
     try {
       const categorias = await usuarioCategoriasService.getCategoriasDisponibles()
+      console.log('Categorías cargadas:', categorias)
       setCategoriasDisponibles(categorias)
     } catch (error) {
       console.error('Error cargando categorías:', error)
     }
   }
+
+  const preguntasFiltradas = categoriaFiltro 
+    ? preguntas.filter(pregunta => pregunta.categoria === categoriaFiltro)
+    : preguntas
 
   const loadUserInfo = async () => {
     try {
@@ -652,6 +658,9 @@ const GestionPreguntas = () => {
                     <label className="label">
                       <span className="label-text text-gray-700">Opciones de Respuesta *</span>
                     </label>
+                    <p className="text-sm text-gray-600 mb-3">
+                      Las primeras 2 opciones son obligatorias. Las opciones 3 y 4 son opcionales.
+                    </p>
                     <div className="space-y-3">
                       {formData.opciones.map((opcion, index) => (
                         <div key={index} className="flex items-center gap-3">
@@ -667,8 +676,8 @@ const GestionPreguntas = () => {
                             value={opcion.texto_opcion}
                             onChange={(e) => handleOpcionChange(index, 'texto_opcion', e.target.value)}
                             className="input input-bordered flex-1 bg-white border-gray-300 text-gray-800"
-                            placeholder={`Opción ${index + 1}`}
-                            required
+                            placeholder={index < 2 ? `Opción ${index + 1} (requerida)` : `Opción ${index + 1} (opcional)`}
+                            required={index < 2}
                           />
                           <span className="text-sm text-gray-700">
                             {opcion.es_correcta ? '✅ Correcta' : '❌ Incorrecta'}
@@ -704,17 +713,49 @@ const GestionPreguntas = () => {
           <div className="card bg-white border border-gray-300 shadow-lg">
             <div className="card-body">
               <h2 className="card-title text-2xl text-gray-800 mb-6">
-                📋 Preguntas del Quiz ({preguntas.length})
+                📋 Base de Datos de Preguntas ({preguntasFiltradas.length})
               </h2>
               
-              {preguntas.length === 0 ? (
+              {/* Filtro por categoría */}
+              <div className="mb-6">
+                <label className="label">
+                  <span className="label-text font-medium text-gray-700">Filtrar por categoría:</span>
+                </label>
+                <select 
+                  className="select select-bordered w-full max-w-xs"
+                  value={categoriaFiltro}
+                  onChange={(e) => setCategoriaFiltro(e.target.value)}
+                >
+                  <option value="">Todas las categorías</option>
+                  {categoriasDisponibles.length > 0 ? (
+                    categoriasDisponibles.map((categoriaNombre, index) => (
+                      <option key={`categoria-${index}`} value={categoriaNombre}>
+                        {categoriaNombre}
+                      </option>
+                    ))
+                  ) : (
+                    <option key="loading" disabled>Cargando categorías...</option>
+                  )}
+                </select>
+              </div>
+              
+              {preguntasFiltradas.length === 0 ? (
                 <div className="text-center text-gray-500 py-8">
-                  <p className="text-lg">No hay preguntas configuradas.</p>
-                  <p className="text-sm">Haz clic en "Agregar Nueva Pregunta" para comenzar.</p>
+                  {categoriaFiltro ? (
+                    <>
+                      <p className="text-lg">No hay preguntas en la categoría "{categoriaFiltro}".</p>
+                      <p className="text-sm">Selecciona otra categoría o agrega preguntas a esta categoría.</p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-lg">No hay preguntas configuradas.</p>
+                      <p className="text-sm">Haz clic en "Agregar Nueva Pregunta" para comenzar.</p>
+                    </>
+                  )}
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {preguntas.map((pregunta) => {
+                  {preguntasFiltradas.map((pregunta) => {
                     const preguntaOpciones = opciones.filter(op => op.pregunta_id === pregunta.id)
                     const opcionCorrecta = preguntaOpciones.find(op => op.es_correcta)
                     
