@@ -726,7 +726,6 @@ const GestionPreguntas = () => {
                             <div className="flex flex-wrap gap-2 mb-3">
                               <span className="badge bg-amber-600 text-white border-0">{pregunta.categoria}</span>
                               <span className="badge bg-gray-600 text-white border-0">{pregunta.nivel_dificultad}</span>
-                              <span className="badge bg-gray-500 text-white border-0">Orden: {pregunta.orden_mostrar}</span>
                             </div>
                             {pregunta.imagen_url && (
                               <div className="mb-3">
