@@ -6,10 +6,10 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 // Crear cliente de Supabase
 let supabaseClient
 
-// Usar valores por defecto para evitar problemas de deploy
+// Usar variables de entorno o valores por defecto
 supabaseClient = createClient(
-  'https://placeholder.supabase.co', 
-  'placeholder-key'
+  supabaseUrl || 'https://placeholder.supabase.co', 
+  supabaseAnonKey || 'placeholder-key'
 )
 
 export const supabase = supabaseClient
