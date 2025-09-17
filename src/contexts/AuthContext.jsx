@@ -34,7 +34,8 @@ export const AuthProvider = ({ children }) => {
             nombre: userData.nombre,
             primer_apellido: userData.primer_apellido,
             segundo_apellido: userData.segundo_apellido,
-            rol: userData.rol
+            rol: userData.rol,
+            estado: userData.estado
           })
           setIsAuthenticated(true)
           console.log('✅ Sesión restaurada exitosamente')
@@ -97,6 +98,7 @@ export const AuthProvider = ({ children }) => {
           primer_apellido: userData.primer_apellido,
           segundo_apellido: userData.segundo_apellido,
           rol: userData.rol,
+          estado: userData.estado,
           token: Date.now().toString()
         }
         
@@ -110,7 +112,8 @@ export const AuthProvider = ({ children }) => {
           nombre: userData.nombre,
           primer_apellido: userData.primer_apellido,
           segundo_apellido: userData.segundo_apellido,
-          rol: userData.rol
+          rol: userData.rol,
+          estado: userData.estado
         })
         setIsAuthenticated(true)
         
@@ -154,13 +157,55 @@ export const AuthProvider = ({ children }) => {
   const getUserInfo = async () => {
     if (!user) return null
     
-    // Retornar información del usuario desde el estado local
-    return {
-      identificacion: user.identificacion,
-      nombre: user.nombre,
-      primer_apellido: user.primer_apellido,
-      segundo_apellido: user.segundo_apellido,
-      rol: user.rol
+    try {
+      // Obtener datos actualizados del usuario desde la base de datos
+      const { data, error } = await supabase
+        .from('usuarios')
+        .select('identificacion, nombre, primer_apellido, segundo_apellido, rol, estado')
+        .eq('identificacion', user.identificacion)
+        .single()
+
+      if (error) {
+        console.error('Error obteniendo datos del usuario:', error)
+        // Fallback a datos locales si falla la consulta
+        return {
+          identificacion: user.identificacion,
+          nombre: user.nombre,
+          primer_apellido: user.primer_apellido,
+          segundo_apellido: user.segundo_apellido,
+          rol: user.rol,
+          estado: 'Desconocido'
+        }
+      }
+
+      // Actualizar datos locales con la información más reciente
+      const updatedUser = {
+        identificacion: data.identificacion,
+        nombre: data.nombre,
+        primer_apellido: data.primer_apellido,
+        segundo_apellido: data.segundo_apellido,
+        rol: data.rol,
+        estado: data.estado
+      }
+
+      // Actualizar el estado local del usuario
+      setUser(updatedUser)
+
+      // Actualizar localStorage
+      localStorage.setItem('userInfo', JSON.stringify(updatedUser))
+
+      return updatedUser
+    } catch (error) {
+      console.error('Error en getUserInfo:', error)
+      // Fallback a datos locales
+      return {
+        identificacion: user.identificacion,
+        nombre: user.nombre,
+        primer_apellido: user.primer_apellido,
+        segundo_apellido: user.segundo_apellido,
+        rol: user.rol,
+        estado: 'Desconocido'
+      }
     }
   }
 

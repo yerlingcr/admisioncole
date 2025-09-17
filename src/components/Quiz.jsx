@@ -22,6 +22,7 @@ const Quiz = () => {
   const [quizConfig, setQuizConfig] = useState(null)
   const [currentAttempt, setCurrentAttempt] = useState(null)
   const [informacionInstitucional, setInformacionInstitucional] = useState(null)
+  const [isProgressRestored, setIsProgressRestored] = useState(false)
 
   // Paleta de colores del sistema
   const colors = {
@@ -35,8 +36,65 @@ const Quiz = () => {
     loadUserInfo()
   }, [])
 
+  // Guardar progreso en localStorage cada vez que cambien las respuestas o el tiempo
+  useEffect(() => {
+    if (userInfo?.identificacion && questions.length > 0) {
+      const progressData = {
+        studentId: userInfo.identificacion,
+        answers: answers,
+        timeLeft: timeLeft,
+        currentQuestion: currentQuestion,
+        questions: questions,
+        quizConfig: quizConfig,
+        currentAttempt: currentAttempt,
+        timestamp: Date.now()
+      }
+      localStorage.setItem('quizProgress', JSON.stringify(progressData))
+    }
+  }, [answers, timeLeft, currentQuestion, userInfo?.identificacion, questions, quizConfig, currentAttempt])
+
+
   useEffect(() => {
     if (userInfo?.identificacion) {
+      // Primero verificar si hay progreso guardado
+      const savedProgress = localStorage.getItem('quizProgress')
+      if (savedProgress) {
+        try {
+          const progressData = JSON.parse(savedProgress)
+          const isRecent = Date.now() - progressData.timestamp < 24 * 60 * 60 * 1000
+          const isSameStudent = progressData.studentId === userInfo.identificacion
+          
+          if (isSameStudent && isRecent && progressData.questions?.length > 0) {
+            console.log('🔄 Cargando progreso guardado en lugar de datos nuevos...')
+            setAnswers(progressData.answers || {})
+            setTimeLeft(progressData.timeLeft || 0)
+            setCurrentQuestion(progressData.currentQuestion || 0)
+            setQuestions(progressData.questions || [])
+            setQuizConfig(progressData.quizConfig || null)
+            setCurrentAttempt(progressData.currentAttempt || null)
+            setIsProgressRestored(true) // Marcar que se restauró el progreso
+            
+            // Mostrar mensaje de progreso restaurado
+            Swal.fire({
+              title: 'Progreso Restaurado',
+              text: 'Se ha restaurado tu progreso anterior. Puedes continuar donde lo dejaste.',
+              icon: 'info',
+              timer: 3000,
+              timerProgressBar: true,
+              showConfirmButton: false
+            })
+            
+            // Solo cargar información institucional, no datos del quiz
+            loadInformacionInstitucional()
+            return // Salir temprano para no cargar datos nuevos
+          }
+        } catch (error) {
+          console.error('Error cargando progreso guardado:', error)
+          localStorage.removeItem('quizProgress')
+        }
+      }
+      
+      // Si no hay progreso guardado válido, cargar datos normalmente
       loadQuizData()
       loadInformacionInstitucional()
     }
@@ -44,16 +102,25 @@ const Quiz = () => {
 
   // Cronómetro
   useEffect(() => {
-    if (timeLeft > 0) {
+    // No iniciar el cronómetro si se acaba de restaurar el progreso
+    if (isProgressRestored) {
+      // Esperar 3 segundos antes de reanudar el cronómetro
+      const resumeTimer = setTimeout(() => {
+        setIsProgressRestored(false)
+      }, 3000)
+      return () => clearTimeout(resumeTimer)
+    }
+    
+    if (timeLeft > 0 && !isProgressRestored) {
       const timer = setInterval(() => {
         setTimeLeft(prev => prev - 1)
       }, 1000)
       return () => clearInterval(timer)
-    } else {
+    } else if (timeLeft === 0 && !isProgressRestored) {
       // Tiempo agotado, finalizar quiz
-      handleFinishQuiz()
+      handleFinishQuiz(true) // Pasar true para indicar que se acabó el tiempo
     }
-  }, [timeLeft])
+  }, [timeLeft, isProgressRestored])
 
   const loadUserInfo = async () => {
     try {
@@ -220,7 +287,12 @@ const Quiz = () => {
     }
   }
 
-  const handleFinishQuiz = async () => {
+  // Función para limpiar progreso guardado
+  const clearSavedProgress = () => {
+    localStorage.removeItem('quizProgress')
+  }
+
+  const handleFinishQuiz = async (isTimeUp = false) => {
     try {
       if (!currentAttempt) {
         alert('Error: No se encontró el intento del quiz')
@@ -249,9 +321,40 @@ const Quiz = () => {
         currentAttempt.id,
         timeUsed,
         score,
-        Object.keys(answers).length,
+        questions.filter(q => answers[q.id]).length,
         correctAnswers
       )
+
+      // Limpiar progreso guardado al completar el quiz
+      localStorage.removeItem('quizProgress')
+
+      // Mostrar mensaje específico si se acabó el tiempo
+      if (isTimeUp) {
+        await Swal.fire({
+          title: '⏰ Tiempo Agotado',
+          html: `
+            <div style="text-align: left;">
+              <p><strong>Se ha agotado el tiempo para completar la prueba.</strong></p>
+              <br>
+              <p><strong>Tu prueba ha sido enviada automáticamente con:</strong></p>
+              <ul style="margin-left: 20px;">
+                <li><strong>Preguntas respondidas:</strong> ${questions.filter(q => answers[q.id]).length} de ${totalQuestions}</li>
+                <li><strong>Tiempo utilizado:</strong> ${Math.floor(timeUsed / 60)}:${(timeUsed % 60).toString().padStart(2, '0')}</li>
+                <li><strong>Respuestas correctas:</strong> ${correctAnswers}</li>
+              </ul>
+              <br>
+              <p><strong>Los resultados serán evaluados y publicados próximamente.</strong></p>
+            </div>
+          `,
+          icon: 'warning',
+          confirmButtonText: 'Ver Resultados',
+          confirmButtonColor: '#f4b100',
+          background: '#ffffff',
+          color: '#4d3930',
+          timer: 8000,
+          timerProgressBar: true
+        })
+      }
 
       // Navegar a los resultados
       navigate('/estudiante/resultado', {
@@ -264,7 +367,8 @@ const Quiz = () => {
             score,
             correctAnswers,
             totalQuestions,
-            timeUsed
+            timeUsed,
+            isTimeUp // Agregar flag para saber si se acabó el tiempo
           }
         }
       })
@@ -404,10 +508,6 @@ const Quiz = () => {
           {/* Pregunta Actual Compacta */}
           <div className="card shadow-2xl mb-4" style={{ backgroundColor: colors.white + '10', backdropFilter: 'blur(10px)', border: '1px solid ' + colors.accent + '40' }}>
             <div className="card-body p-4">
-              <h3 className="card-title text-lg mb-3" style={{ color: colors.white }}>
-                {getCurrentQuestion()?.pregunta || 'Pregunta no disponible'}
-              </h3>
-              
               {/* Imagen de la pregunta (si existe) */}
               {getCurrentQuestion()?.imagen_url && (
                 <div className="mb-3 text-center">
@@ -420,6 +520,10 @@ const Quiz = () => {
                   <p className="text-xs text-blue-200 mt-1">Haz clic en la imagen para ampliarla</p>
                 </div>
               )}
+              
+              <h3 className="card-title text-lg mb-3" style={{ color: colors.white }}>
+                {getCurrentQuestion()?.pregunta || 'Pregunta no disponible'}
+              </h3>
               
               {/* Opciones de respuesta compactas */}
               <div className="space-y-2">
@@ -483,13 +587,13 @@ const Quiz = () => {
             <div className="text-center" style={{ color: colors.white }}>
               <span className="text-xs" style={{ color: colors.secondary }}>Progreso:</span>
               <span className="ml-1 text-sm font-bold">
-                {Object.keys(answers).length} / {questions.length}
+                {questions.filter(q => answers[q.id]).length} / {questions.length}
               </span>
             </div>
             
             {currentQuestion === questions.length - 1 ? (
               <button
-                onClick={handleFinishQuiz}
+                onClick={() => handleFinishQuiz(false)}
                 disabled={!isAllQuestionsAnswered()}
                 className="btn btn-sm border-0 disabled:opacity-50"
                 style={{ backgroundColor: colors.secondary, color: colors.white }}
@@ -506,6 +610,7 @@ const Quiz = () => {
               </button>
             )}
           </div>
+
         </div>
       </div>
 

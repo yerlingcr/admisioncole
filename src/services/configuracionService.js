@@ -51,14 +51,24 @@ export const configuracionService = {
         .update({ activa: false })
         .eq('activa', true);
 
+      // Mapear campos del formulario a la base de datos
+      const configData = {
+        tiempo_limite_minutos: configuracion.tiempo_limite_minutos,
+        total_preguntas: configuracion.numero_preguntas,
+        puntuacion_minima_aprobacion: configuracion.puntaje_minimo_aprobacion,
+        intentos_permitidos: configuracion.intentos_permitidos,
+        puntaje_por_pregunta: configuracion.puntaje_por_pregunta,
+        orden_preguntas_aleatorio: configuracion.orden_preguntas_aleatorio,
+        orden_opciones_aleatorio: configuracion.orden_opciones_aleatorio,
+        usuario_creador: usuario,
+        usuario_modificador: usuario,
+        activa: true
+      };
+
       // Crear nueva configuración
       const { data, error } = await supabase
         .from('configuracion_quiz')
-        .insert({
-          ...configuracion,
-          usuario_modificador: usuario,
-          activa: true
-        })
+        .insert(configData)
         .select()
         .single();
 
@@ -77,12 +87,23 @@ export const configuracionService = {
   // Actualizar configuración existente
   async actualizarConfiguracion(id, configuracion, usuario) {
     try {
+      // Mapear campos del formulario a la base de datos
+      const configData = {
+        tiempo_limite_minutos: configuracion.tiempo_limite_minutos,
+        total_preguntas: configuracion.numero_preguntas,
+        puntuacion_minima_aprobacion: configuracion.puntaje_minimo_aprobacion,
+        intentos_permitidos: configuracion.intentos_permitidos,
+        puntaje_por_pregunta: configuracion.puntaje_por_pregunta,
+        orden_preguntas_aleatorio: configuracion.orden_preguntas_aleatorio,
+        orden_opciones_aleatorio: configuracion.orden_opciones_aleatorio,
+        usuario_modificador: usuario,
+        fecha_modificacion: new Date().toISOString()
+      };
+
+
       const { data, error } = await supabase
         .from('configuracion_quiz')
-        .update({
-          ...configuracion,
-          usuario_modificador: usuario
-        })
+        .update(configData)
         .eq('id', id)
         .select()
         .single();
@@ -161,6 +182,20 @@ export const configuracionService = {
       orden_preguntas_aleatorio: true,
       orden_opciones_aleatorio: true,
       activa: true
+    };
+  },
+
+  // Mapear configuración de la base de datos al formulario
+  mapearConfiguracionParaFormulario(configuracion) {
+    return {
+      tiempo_limite_minutos: configuracion.tiempo_limite_minutos || 5,
+      numero_preguntas: configuracion.total_preguntas || configuracion.numero_preguntas || 5,
+      puntaje_minimo_aprobacion: configuracion.puntuacion_minima_aprobacion || configuracion.puntaje_minimo_aprobacion || 70,
+      intentos_permitidos: configuracion.intentos_permitidos || 2,
+      puntaje_por_pregunta: configuracion.puntaje_por_pregunta || 20,
+      orden_preguntas_aleatorio: configuracion.orden_preguntas_aleatorio !== undefined ? configuracion.orden_preguntas_aleatorio : true,
+      orden_opciones_aleatorio: configuracion.orden_opciones_aleatorio !== undefined ? configuracion.orden_opciones_aleatorio : true,
+      activa: configuracion.activa || false
     };
   },
 

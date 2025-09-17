@@ -14,8 +14,6 @@ const ConfiguracionPrueba = () => {
   const [institucionFormData, setInstitucionFormData] = useState({
     nombre_centro_educativo: '',
     escudo_centro_url: '',
-    nombre_especialidad: '',
-    logo_especialidad_url: '',
     descripcion_centro: '',
     descripcion_especialidad: ''
   });
@@ -89,8 +87,6 @@ const ConfiguracionPrueba = () => {
       setInstitucionFormData({
         nombre_centro_educativo: informacionInstitucional.nombre_centro_educativo || '',
         escudo_centro_url: informacionInstitucional.escudo_centro_url || '',
-        nombre_especialidad: informacionInstitucional.nombre_especialidad || '',
-        logo_especialidad_url: informacionInstitucional.logo_especialidad_url || '',
         descripcion_centro: informacionInstitucional.descripcion_centro || '',
         descripcion_especialidad: informacionInstitucional.descripcion_especialidad || ''
       });
@@ -196,18 +192,30 @@ const ConfiguracionPrueba = () => {
         usuario = `${userData.nombre} ${userData.primer_apellido} ${userData.segundo_apellido}`.trim();
       }
       
-      if (configuracionActiva) {
-        await configuracionService.actualizarConfiguracion(
-          configuracionActiva.id, 
-          formData, 
-          usuario
-        );
-        Swal.fire({
-          icon: 'success',
-          title: '¡Configuración actualizada!',
-          text: 'Los cambios se han guardado correctamente',
-          confirmButtonColor: colors.primary
-        });
+      if (configuracionActiva && configuracionActiva.id) {
+        try {
+          await configuracionService.actualizarConfiguracion(
+            configuracionActiva.id, 
+            formData, 
+            usuario
+          );
+          Swal.fire({
+            icon: 'success',
+            title: '¡Configuración actualizada!',
+            text: 'Los cambios se han guardado correctamente',
+            confirmButtonColor: colors.primary
+          });
+        } catch (updateError) {
+          console.log('Error al actualizar, creando nueva configuración:', updateError);
+          // Si falla la actualización, crear una nueva
+          await configuracionService.crearConfiguracion(formData, usuario);
+          Swal.fire({
+            icon: 'success',
+            title: '¡Configuración creada!',
+            text: 'Se creó una nueva configuración activa',
+            confirmButtonColor: colors.primary
+          });
+        }
       } else {
         await configuracionService.crearConfiguracion(formData, usuario);
         Swal.fire({
@@ -233,15 +241,8 @@ const ConfiguracionPrueba = () => {
   };
 
   const handleEdit = (config) => {
-    setFormData({
-      tiempo_limite_minutos: config.tiempo_limite_minutos,
-      numero_preguntas: config.numero_preguntas,
-      puntaje_minimo_aprobacion: config.puntaje_minimo_aprobacion,
-      intentos_permitidos: config.intentos_permitidos,
-      puntaje_por_pregunta: config.puntaje_por_pregunta,
-      orden_preguntas_aleatorio: config.orden_preguntas_aleatorio,
-      orden_opciones_aleatorio: config.orden_opciones_aleatorio
-    });
+    const configMapeada = configuracionService.mapearConfiguracionParaFormulario(config);
+    setFormData(configMapeada);
     setEditingConfig(config);
     setShowForm(true);
   };
@@ -436,11 +437,11 @@ const ConfiguracionPrueba = () => {
               </div>
               <div>
                 <label className="text-sm font-semibold">Preguntas:</label>
-                <p className="text-lg">{configuracionActiva.numero_preguntas}</p>
+                <p className="text-lg">{configuracionActiva.total_preguntas}</p>
               </div>
               <div>
                 <label className="text-sm font-semibold">Puntaje mínimo:</label>
-                <p className="text-lg">{configuracionActiva.puntaje_minimo_aprobacion}%</p>
+                <p className="text-lg">{configuracionActiva.puntuacion_minima_aprobacion}%</p>
               </div>
               <div>
                 <label className="text-sm font-semibold">Intentos:</label>
@@ -449,7 +450,7 @@ const ConfiguracionPrueba = () => {
             </div>
             <div className="mt-4 text-sm text-gray-600">
               <p>Modificado por: {configuracionActiva.usuario_modificador}</p>
-              <p>Última actualización: {new Date(configuracionActiva.updated_at).toLocaleString()}</p>
+              <p>Última actualización: {new Date(configuracionActiva.fecha_modificacion || configuracionActiva.updated_at).toLocaleString()}</p>
             </div>
           </div>
         </div>
@@ -637,33 +638,6 @@ const ConfiguracionPrueba = () => {
                   />
                 </div>
 
-                <div className="form-control">
-                  <label className="label">
-                    <span className="label-text font-semibold">Nombre de la Especialidad</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="nombre_especialidad"
-                    value={institucionFormData.nombre_especialidad}
-                    onChange={handleInstitucionInputChange}
-                    className="input input-bordered"
-                    required
-                  />
-                </div>
-
-                <div className="form-control">
-                  <label className="label">
-                    <span className="label-text font-semibold">URL del Logo de la Especialidad</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="logo_especialidad_url"
-                    value={institucionFormData.logo_especialidad_url}
-                    onChange={handleInstitucionInputChange}
-                    className="input input-bordered"
-                    placeholder="/img/ico/secretariado.png"
-                  />
-                </div>
 
                 <div className="form-control">
                   <label className="label">
@@ -728,11 +702,11 @@ const ConfiguracionPrueba = () => {
               </div>
               <div>
                 <label className="text-sm font-semibold">Número de preguntas:</label>
-                <p className="text-lg">{configuracionActiva.numero_preguntas}</p>
+                <p className="text-lg">{configuracionActiva.total_preguntas}</p>
               </div>
               <div>
                 <label className="text-sm font-semibold">Puntaje mínimo para aprobar:</label>
-                <p className="text-lg">{configuracionActiva.puntaje_minimo_aprobacion}%</p>
+                <p className="text-lg">{configuracionActiva.puntuacion_minima_aprobacion}%</p>
               </div>
               <div>
                 <label className="text-sm font-semibold">Intentos permitidos:</label>
@@ -750,7 +724,7 @@ const ConfiguracionPrueba = () => {
               </div>
               <div className="md:col-span-2">
                 <label className="text-sm font-semibold">Última modificación:</label>
-                <p className="text-lg">{new Date(configuracionActiva.updated_at).toLocaleString()}</p>
+                <p className="text-lg">{new Date(configuracionActiva.fecha_modificacion || configuracionActiva.updated_at).toLocaleString()}</p>
               </div>
               <div className="md:col-span-2">
                 <label className="text-sm font-semibold">Modificado por:</label>

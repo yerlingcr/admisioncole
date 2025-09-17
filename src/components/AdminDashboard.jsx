@@ -8,6 +8,8 @@ import GestionPreguntas from './GestionPreguntas'
 import GestionUsuarios from './GestionUsuarios'
 import GestionCategorias from './GestionCategorias'
 import ConfiguracionPrueba from './ConfiguracionPrueba'
+import Estadisticas from './Estadisticas'
+import Reportes from './Reportes'
 
 const AdminDashboard = () => {
   const { user, logout, getUserInfo } = useAuth()
@@ -246,9 +248,25 @@ const AdminDashboard = () => {
                    style={{ 
                      backgroundColor: 'rgba(180, 123, 33, 0.1)',
                      ':hover': { backgroundColor: 'rgba(180, 123, 33, 0.2)' }
-                   }}>
+                   }}
+                   onClick={() => openTab('estadisticas', '📈 Estadísticas del Sistema', '📈')}
+              >
                 <span className="text-xl mr-3" style={{ color: '#f4b100' }}>📈</span>
                 <span style={{ color: '#ffffff' }}>Estadísticas</span>
+              </div>
+            </li>
+
+            {/* Reportes */}
+            <li>
+              <div className="flex items-center p-3 rounded-lg cursor-pointer transition-colors hover:bg-opacity-20"
+                   style={{ 
+                     backgroundColor: 'rgba(180, 123, 33, 0.1)',
+                     ':hover': { backgroundColor: 'rgba(180, 123, 33, 0.2)' }
+                   }}
+                   onClick={() => openTab('reportes', '📊 Reportes de Estudiantes', '📊')}
+              >
+                <span className="text-xl mr-3" style={{ color: '#f4b100' }}>📊</span>
+                <span style={{ color: '#ffffff' }}>Reportes</span>
               </div>
             </li>
 
@@ -266,41 +284,7 @@ const AdminDashboard = () => {
               </div>
             </li>
 
-            {/* Logs del Sistema */}
-            <li>
-              <div className="flex items-center p-3 rounded-lg cursor-pointer transition-colors hover:bg-opacity-20"
-                   style={{ 
-                     backgroundColor: 'rgba(180, 123, 33, 0.1)',
-                     ':hover': { backgroundColor: 'rgba(180, 123, 33, 0.2)' }
-                   }}>
-                <span className="text-xl mr-3" style={{ color: '#f4b100' }}>📋</span>
-                <span style={{ color: '#ffffff' }}>Logs del Sistema</span>
-              </div>
-            </li>
 
-            {/* Seguridad */}
-            <li>
-              <div className="flex items-center p-3 rounded-lg cursor-pointer transition-colors hover:bg-opacity-20"
-                   style={{ 
-                     backgroundColor: 'rgba(180, 123, 33, 0.1)',
-                     ':hover': { backgroundColor: 'rgba(180, 123, 33, 0.2)' }
-                   }}>
-                <span className="text-xl mr-3" style={{ color: '#f4b100' }}>🔒</span>
-                <span style={{ color: '#ffffff' }}>Seguridad</span>
-              </div>
-            </li>
-
-            {/* Backup */}
-            <li>
-              <div className="flex items-center p-3 rounded-lg cursor-pointer transition-colors hover:bg-opacity-20"
-                   style={{ 
-                     backgroundColor: 'rgba(180, 123, 33, 0.1)',
-                     ':hover': { backgroundColor: 'rgba(180, 123, 33, 0.2)' }
-                   }}>
-                <span className="text-xl mr-3" style={{ color: '#f4b100' }}>💾</span>
-                <span style={{ color: '#ffffff' }}>Backup</span>
-              </div>
-            </li>
           </ul>
         </nav>
 
@@ -322,10 +306,11 @@ const AdminDashboard = () => {
             </div>
             <button 
               onClick={handleLogout}
-              className="btn btn-xs btn-ghost"
+              className="btn btn-xs btn-ghost hover:bg-red-600 hover:text-white transition-colors"
               style={{ color: '#f4b100' }}
+              title="Cerrar Sesión"
             >
-              🚪
+              🚪 Cerrar
             </button>
           </div>
         </div>
@@ -466,6 +451,17 @@ const AdminDashboard = () => {
           {activeTab === 'configuracion' && (
             <ConfiguracionPrueba />
           )}
+
+          {/* Pestaña Estadísticas */}
+          {activeTab === 'estadisticas' && (
+            <Estadisticas />
+          )}
+
+          {/* Pestaña Reportes */}
+          {activeTab === 'reportes' && (
+            <Reportes />
+          )}
+
         </div>
       </div>
     </div>

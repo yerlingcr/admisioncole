@@ -44,6 +44,8 @@ const GestionUsuarios = () => {
   // Estados para categorías
   const [categoriasDisponibles, setCategoriasDisponibles] = useState([])
   const [categoriasUsuario, setCategoriasUsuario] = useState([])
+  const [openDropdown, setOpenDropdown] = useState(null)
+  const [searchFilter, setSearchFilter] = useState('')
 
   useEffect(() => {
     loadUserInfo()
@@ -52,9 +54,23 @@ const GestionUsuarios = () => {
     loadCategoriasDisponibles()
   }, [])
 
+  // Cerrar dropdown al hacer clic fuera
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (openDropdown && !event.target.closest('.relative')) {
+        closeDropdown()
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [openDropdown])
+
   // Efecto para limpiar categorías cuando se cambia el rol
   useEffect(() => {
-    if (formData.rol !== 'Estudiante') {
+    if (formData.rol !== 'Estudiante' && formData.rol !== 'Profesor') {
       setCategoriasUsuario([])
     }
   }, [formData.rol])
@@ -90,7 +106,29 @@ const GestionUsuarios = () => {
         .order('identificacion')
 
       if (error) throw error
-      setUsuarios(data || [])
+      
+      // Cargar categorías para cada usuario
+      const usuariosConCategorias = await Promise.all(
+        (data || []).map(async (usuario) => {
+          const { data: categoriasData, error: categoriasError } = await supabase
+            .from('usuario_categorias')
+            .select('categoria')
+            .eq('usuario_id', usuario.identificacion)
+            .eq('activa', true)
+
+          if (categoriasError) {
+            console.error('Error cargando categorías para usuario:', usuario.identificacion, categoriasError)
+            return { ...usuario, categorias: [] }
+          }
+
+          return {
+            ...usuario,
+            categorias: categoriasData?.map(cat => cat.categoria) || []
+          }
+        })
+      )
+
+      setUsuarios(usuariosConCategorias)
     } catch (error) {
       console.error('Error cargando usuarios:', error)
     } finally {
@@ -229,6 +267,83 @@ const GestionUsuarios = () => {
     }
   }
 
+  const handleToggleEstado = async (usuario) => {
+    try {
+      setLoading(true)
+      
+      const nuevoEstado = usuario.estado === 'Activo' ? 'Inactivo' : 'Activo'
+      const accion = nuevoEstado === 'Activo' ? 'activar' : 'desactivar'
+      
+      // Mostrar confirmación con SweetAlert2
+      const result = await Swal.fire({
+        title: `¿${accion.charAt(0).toUpperCase() + accion.slice(1)} usuario?`,
+        html: `
+          <div style="text-align: left;">
+            <p><strong>Esta acción cambiará el estado del usuario:</strong></p>
+            <br>
+            <p><strong>${usuario.nombre} ${usuario.primer_apellido}</strong></p>
+            <p><strong>ID:</strong> ${usuario.identificacion}</p>
+            <p><strong>Rol:</strong> ${usuario.rol}</p>
+            <br>
+            <p><strong>Estado actual:</strong> ${usuario.estado}</p>
+            <p><strong>Nuevo estado:</strong> ${nuevoEstado}</p>
+            <br>
+            <p><strong>⚠️ IMPORTANTE:</strong></p>
+            <ul style="margin-left: 20px;">
+              <li>Los usuarios inactivos no podrán iniciar sesión</li>
+              <li>Los estudiantes inactivos no podrán tomar la prueba</li>
+              <li>Los profesores inactivos no podrán gestionar contenido</li>
+            </ul>
+          </div>
+        `,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: nuevoEstado === 'Activo' ? '#10b981' : '#d33',
+        cancelButtonColor: '#6b7280',
+        confirmButtonText: `Sí, ${accion}`,
+        cancelButtonText: 'Cancelar',
+        background: '#ffffff',
+        color: '#4d3930'
+      })
+
+      if (result.isConfirmed) {
+        // Actualizar el estado del usuario
+        const { error } = await supabase
+          .from('usuarios')
+          .update({ estado: nuevoEstado })
+          .eq('identificacion', usuario.identificacion)
+
+        if (error) throw error
+
+        await Swal.fire({
+          icon: 'success',
+          title: `¡Usuario ${accion}do!`,
+          text: `El usuario ${usuario.nombre} ha sido ${accion}do exitosamente.`,
+          confirmButtonText: 'Entendido',
+          confirmButtonColor: '#f4b100',
+          background: '#ffffff',
+          color: '#4d3930'
+        })
+        
+        // Recargar la lista de usuarios
+        await loadUsuarios()
+      }
+    } catch (error) {
+      console.error('Error cambiando estado del usuario:', error)
+      await Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: 'No se pudo cambiar el estado del usuario.',
+        confirmButtonText: 'Entendido',
+        confirmButtonColor: '#b47b21',
+        background: '#ffffff',
+        color: '#4d3930'
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const handleSubmit = async (e) => {
     e.preventDefault()
     
@@ -259,9 +374,9 @@ const GestionUsuarios = () => {
         if (error) throw error
         console.log('✅ Usuario actualizado')
 
-        // Si es un estudiante, también actualizar sus categorías
-        if (formData.rol === 'Estudiante') {
-          console.log('🔍 Actualizando categorías para estudiante:', editingUsuario.identificacion)
+        // Si es un estudiante o profesor, también actualizar sus categorías
+        if (formData.rol === 'Estudiante' || formData.rol === 'Profesor') {
+          console.log('🔍 Actualizando categorías para', formData.rol.toLowerCase(), ':', editingUsuario.identificacion)
           console.log('📚 Categorías a asignar:', categoriasUsuario)
           
           const result = await usuarioCategoriasService.asignarCategorias(
@@ -278,16 +393,21 @@ const GestionUsuarios = () => {
         }
       } else {
         // Crear nuevo usuario
+        const usuarioData = {
+          ...formData,
+          password: formData.identificacion // La contraseña será igual a la identificación
+        }
+        
         const { error } = await supabase
           .from('usuarios')
-          .insert(formData)
+          .insert(usuarioData)
 
         if (error) throw error
         console.log('✅ Usuario creado')
 
-        // Si es un estudiante, también asignar sus categorías
-        if (formData.rol === 'Estudiante') {
-          console.log('🔍 Asignando categorías para nuevo estudiante:', formData.identificacion)
+        // Si es un estudiante o profesor, también asignar sus categorías
+        if (formData.rol === 'Estudiante' || formData.rol === 'Profesor') {
+          console.log('🔍 Asignando categorías para nuevo', formData.rol.toLowerCase(), ':', formData.identificacion)
           console.log('📚 Categorías a asignar:', categoriasUsuario)
           
           const result = await usuarioCategoriasService.asignarCategorias(
@@ -304,11 +424,31 @@ const GestionUsuarios = () => {
         }
       }
 
+      await Swal.fire({
+        icon: 'success',
+        title: '¡Usuario Guardado!',
+        text: 'El usuario ha sido guardado exitosamente.',
+        confirmButtonText: 'Entendido',
+        confirmButtonColor: '#f4b100',
+        background: '#ffffff',
+        color: '#4d3930',
+        timer: 2000,
+        timerProgressBar: true
+      })
+      
       await loadUsuarios()
       resetForm()
     } catch (error) {
       console.error('❌ Error guardando usuario:', error)
-      alert(`Error guardando usuario: ${error.message}`)
+      await Swal.fire({
+        icon: 'error',
+        title: 'Error al Guardar',
+        text: `Error guardando usuario: ${error.message}`,
+        confirmButtonText: 'Entendido',
+        confirmButtonColor: '#b47b21',
+        background: '#ffffff',
+        color: '#4d3930'
+      })
     } finally {
       setLoading(false)
     }
@@ -334,16 +474,16 @@ const GestionUsuarios = () => {
     
     setEditingUsuario(usuario)
     
-    // Si es un estudiante, cargar sus categorías actuales
-    if (usuario.rol === 'Estudiante') {
+    // Si es un estudiante o profesor, cargar sus categorías actuales
+    if (usuario.rol === 'Estudiante' || usuario.rol === 'Profesor') {
       try {
-        console.log('🔍 Cargando categorías del estudiante:', usuario.identificacion)
+        console.log('🔍 Cargando categorías del', usuario.rol.toLowerCase(), ':', usuario.identificacion)
         const categoriasActuales = await usuarioCategoriasService.getCategoriasByUsuario(usuario.identificacion)
-        console.log('📚 Categorías actuales del estudiante:', categoriasActuales)
+        console.log('📚 Categorías actuales del', usuario.rol.toLowerCase(), ':', categoriasActuales)
         console.log('📚 Categorías disponibles:', categoriasDisponibles)
         setCategoriasUsuario(categoriasActuales)
       } catch (error) {
-        console.error('❌ Error cargando categorías del estudiante:', error)
+        console.error('❌ Error cargando categorías del', usuario.rol.toLowerCase(), ':', error)
         setCategoriasUsuario([])
       }
     } else {
@@ -354,7 +494,32 @@ const GestionUsuarios = () => {
   }
 
   const handleDelete = async (identificacion) => {
-    if (!confirm('¿Estás seguro de que quieres eliminar este usuario? Esta acción no se puede deshacer.')) {
+    const result = await Swal.fire({
+      title: '¿Eliminar Usuario?',
+      html: `
+        <div style="text-align: left;">
+          <p><strong>¿Estás seguro de que quieres eliminar este usuario?</strong></p>
+          <br>
+          <p><strong>⚠️ IMPORTANTE:</strong></p>
+          <ul style="margin-left: 20px;">
+            <li>Esta acción <strong>NO se puede deshacer</strong></li>
+            <li>Se eliminarán todos los datos del usuario</li>
+            <li>Se eliminarán sus intentos de quiz</li>
+            <li>Se eliminarán sus categorías asignadas</li>
+          </ul>
+        </div>
+      `,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#d33',
+      cancelButtonColor: '#6b7280',
+      confirmButtonText: 'Sí, eliminar',
+      cancelButtonText: 'Cancelar',
+      background: '#ffffff',
+      color: '#4d3930'
+    })
+
+    if (!result.isConfirmed) {
       return
     }
 
@@ -366,10 +531,31 @@ const GestionUsuarios = () => {
         .eq('identificacion', identificacion)
 
       if (error) throw error
+      
+      await Swal.fire({
+        icon: 'success',
+        title: '¡Usuario Eliminado!',
+        text: 'El usuario ha sido eliminado exitosamente.',
+        confirmButtonText: 'Entendido',
+        confirmButtonColor: '#f4b100',
+        background: '#ffffff',
+        color: '#4d3930',
+        timer: 2000,
+        timerProgressBar: true
+      })
+      
       await loadUsuarios()
     } catch (error) {
       console.error('Error eliminando usuario:', error)
-      alert('Error eliminando usuario. Por favor, intenta de nuevo.')
+      await Swal.fire({
+        icon: 'error',
+        title: 'Error al Eliminar',
+        text: 'Error eliminando usuario. Por favor, intenta de nuevo.',
+        confirmButtonText: 'Entendido',
+        confirmButtonColor: '#b47b21',
+        background: '#ffffff',
+        color: '#4d3930'
+      })
     } finally {
       setLoading(false)
     }
@@ -378,6 +564,31 @@ const GestionUsuarios = () => {
   const handleLogout = async () => {
     await logout()
     navigate('/login')
+  }
+
+  const toggleDropdown = (identificacion) => {
+    setOpenDropdown(openDropdown === identificacion ? null : identificacion)
+  }
+
+  const closeDropdown = () => {
+    setOpenDropdown(null)
+  }
+
+  const getUsuariosFiltrados = () => {
+    if (!searchFilter.trim()) {
+      return usuarios
+    }
+    
+    const filter = searchFilter.toLowerCase()
+    return usuarios.filter(usuario => 
+      usuario.identificacion.toLowerCase().includes(filter) ||
+      usuario.nombre.toLowerCase().includes(filter) ||
+      usuario.primer_apellido.toLowerCase().includes(filter) ||
+      usuario.segundo_apellido.toLowerCase().includes(filter) ||
+      usuario.email.toLowerCase().includes(filter) ||
+      usuario.rol.toLowerCase().includes(filter) ||
+      usuario.estado.toLowerCase().includes(filter)
+    )
   }
 
   if (loading) {
@@ -690,8 +901,8 @@ const GestionUsuarios = () => {
                     </div>
                   </div>
 
-                  {/* Sección de Categorías - Solo para estudiantes */}
-                  {formData.rol === 'Estudiante' && (
+                  {/* Sección de Categorías - Para estudiantes y profesores */}
+                  {(formData.rol === 'Estudiante' || formData.rol === 'Profesor') && (
                     <div className="mt-6 p-4 rounded-lg" style={{ backgroundColor: '#f4b100', border: '1px solid #b47b21' }}>
                       <div className="flex justify-between items-center mb-4">
                         <h3 className="text-lg font-bold" style={{ color: '#4d3930' }}>
@@ -707,7 +918,10 @@ const GestionUsuarios = () => {
                         </button>
                       </div>
                       <p className="text-sm mb-4" style={{ color: '#4d3930' }}>
-                        Selecciona la categoría de preguntas que aparecerá en la prueba de admisión de este estudiante:
+                        {formData.rol === 'Estudiante' 
+                          ? 'Selecciona la categoría de preguntas que aparecerá en la prueba de admisión de este estudiante:'
+                          : 'Selecciona la categoría de preguntas que podrá gestionar este profesor:'
+                        }
                       </p>
                       
                       {categoriasDisponibles.length === 0 && (
@@ -744,7 +958,7 @@ const GestionUsuarios = () => {
                       {categoriasUsuario.length === 0 && (
                         <div className="alert alert-warning">
                           <span className="text-xs">
-                            ⚠️ Si no seleccionas ninguna categoría, el estudiante verá preguntas de todas las categorías disponibles.
+                            ⚠️ Si no seleccionas ninguna categoría, {formData.rol === 'Estudiante' ? 'el estudiante verá preguntas de todas las categorías disponibles' : 'el profesor no podrá gestionar preguntas específicas'}.
                           </span>
                         </div>
                       )}
@@ -763,11 +977,11 @@ const GestionUsuarios = () => {
                   {!editingUsuario && (
                     <div>
                       <label className="label">
-                        <span className="label-text" style={{ color: '#4d3930' }}>Contraseña *</span>
+                        <span className="label-text" style={{ color: '#4d3930' }}>Contraseña</span>
                       </label>
                       <input
-                        type="password"
-                        value={formData.password}
+                        type="text"
+                        value={formData.password || formData.identificacion}
                         onChange={(e) => handleInputChange('password', e.target.value)}
                         className="input input-bordered w-full"
                         style={{ 
@@ -775,10 +989,14 @@ const GestionUsuarios = () => {
                           borderColor: '#b47b21',
                           color: '#4d3930'
                         }}
-                        placeholder="Contraseña"
-                        required
-                        minLength={6}
+                        placeholder="Se llena automáticamente con la identificación"
+                        readOnly
                       />
+                      <label className="label">
+                        <span className="label-text-alt" style={{ color: '#b47b21' }}>
+                          💡 La contraseña será igual a la identificación del usuario
+                        </span>
+                      </label>
                     </div>
                   )}
 
@@ -821,13 +1039,51 @@ const GestionUsuarios = () => {
                 📋 Usuarios del Sistema ({usuarios.length})
               </h2>
               
+              {/* Filtro de búsqueda */}
+              <div className="mb-4">
+                <div className="flex items-center gap-4">
+                  <div className="flex-1">
+                    <input
+                      type="text"
+                      placeholder="🔍 Buscar usuarios por identificación, nombre, email, rol o estado..."
+                      value={searchFilter}
+                      onChange={(e) => setSearchFilter(e.target.value)}
+                      className="input input-bordered w-full"
+                      style={{ 
+                        backgroundColor: '#ffffff',
+                        borderColor: '#b47b21',
+                        color: '#4d3930'
+                      }}
+                    />
+                  </div>
+                  {searchFilter && (
+                    <button
+                      onClick={() => setSearchFilter('')}
+                      className="btn btn-sm btn-outline"
+                      style={{ 
+                        color: '#b47b21', 
+                        borderColor: '#b47b21',
+                        ':hover': { backgroundColor: '#b47b21', color: '#ffffff' }
+                      }}
+                    >
+                      ✕ Limpiar
+                    </button>
+                  )}
+                </div>
+                {searchFilter && (
+                  <p className="text-sm mt-2" style={{ color: '#4d3930' }}>
+                    Mostrando {getUsuariosFiltrados().length} de {usuarios.length} usuarios
+                  </p>
+                )}
+              </div>
+              
               {usuarios.length === 0 ? (
                 <div className="text-center py-8" style={{ color: '#b47b21' }}>
                   <p className="text-lg">No hay usuarios registrados.</p>
                   <p className="text-sm">Haz clic en "Agregar Nuevo Usuario" para comenzar.</p>
                 </div>
               ) : (
-                                <div className="overflow-x-auto">
+                                <div className="overflow-x-auto" style={{ position: 'relative' }}>
                   <table className="table table-zebra w-full rounded-lg" style={{ backgroundColor: 'rgba(77, 57, 48, 0.05)', border: '1px solid #b47b21' }}>
                     <thead>
                       <tr style={{ backgroundColor: '#4d3930' }}>
@@ -836,11 +1092,12 @@ const GestionUsuarios = () => {
                         <th className="font-semibold border-r" style={{ color: '#ffffff', borderColor: '#b47b21' }}>Rol</th>
                         <th className="font-semibold border-r" style={{ color: '#ffffff', borderColor: '#b47b21' }}>Email</th>
                         <th className="font-semibold border-r" style={{ color: '#ffffff', borderColor: '#b47b21' }}>Estado</th>
+                        <th className="font-semibold border-r" style={{ color: '#ffffff', borderColor: '#b47b21' }}>Categoría</th>
                         <th className="font-semibold" style={{ color: '#ffffff' }}>Acciones</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {usuarios.map((usuario, index) => (
+                      {getUsuariosFiltrados().map((usuario, index) => (
                         <tr key={usuario.identificacion} className="transition-colors" style={{ 
                           backgroundColor: index % 2 === 0 ? 'rgba(180, 123, 33, 0.05)' : 'rgba(180, 123, 33, 0.1)',
                           ':hover': { backgroundColor: 'rgba(244, 177, 0, 0.15)' }
@@ -872,10 +1129,18 @@ const GestionUsuarios = () => {
                               {usuario.estado}
                             </span>
                           </td>
+                          <td className="border-r" style={{ borderColor: '#b47b21' }}>
+                            <span className="text-sm font-medium" style={{ color: '#4d3930' }}>
+                              {usuario.categorias && usuario.categorias.length > 0 
+                                ? usuario.categorias.join(', ') 
+                                : 'Sin categoría'
+                              }
+                            </span>
+                          </td>
                           <td>
-                            <div className="flex gap-2">
+                            <div className="relative">
                               <button
-                                onClick={() => handleEdit(usuario)}
+                                onClick={() => toggleDropdown(usuario.identificacion)}
                                 className="btn btn-sm btn-outline"
                                 style={{ 
                                   color: '#4d3930', 
@@ -883,33 +1148,79 @@ const GestionUsuarios = () => {
                                   ':hover': { backgroundColor: '#f4b100', color: '#ffffff' }
                                 }}
                               >
-                                ✏️ Editar
+                                ⚙️ Acciones
                               </button>
-                              {/* Solo mostrar botón de resetear oportunidades para estudiantes */}
-                              {usuario.rol === 'Estudiante' && (
-                                <button
-                                  onClick={() => handleResetearOportunidades(usuario)}
-                                  className="btn btn-sm btn-outline"
+                              
+                              {openDropdown === usuario.identificacion && (
+                                <div 
+                                  className="absolute right-0 mt-1 w-48 bg-white rounded-md shadow-lg border"
                                   style={{ 
-                                    color: '#4d3930', 
                                     borderColor: '#b47b21',
-                                    ':hover': { backgroundColor: '#b47b21', color: '#ffffff' }
+                                    boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+                                    maxHeight: '300px',
+                                    overflowY: 'auto',
+                                    zIndex: 9999
                                   }}
                                 >
-                                  🔄 Resetear
-                                </button>
+                                  <div className="py-1">
+                                    <button
+                                      onClick={() => {
+                                        handleEdit(usuario)
+                                        closeDropdown()
+                                      }}
+                                      className="flex items-center w-full px-4 py-2 text-sm hover:bg-gray-100"
+                                      style={{ color: '#4d3930' }}
+                                    >
+                                      <span className="mr-2">✏️</span>
+                                      Editar Usuario
+                                    </button>
+                                    
+                                    <button
+                                      onClick={() => {
+                                        handleToggleEstado(usuario)
+                                        closeDropdown()
+                                      }}
+                                      className="flex items-center w-full px-4 py-2 text-sm hover:bg-gray-100"
+                                      style={{ 
+                                        color: usuario.estado === 'Activo' ? '#d33' : '#10b981'
+                                      }}
+                                    >
+                                      <span className="mr-2">
+                                        {usuario.estado === 'Activo' ? '⏸️' : '▶️'}
+                                      </span>
+                                      {usuario.estado === 'Activo' ? 'Desactivar' : 'Activar'}
+                                    </button>
+                                    
+                                    {usuario.rol === 'Estudiante' && (
+                                      <button
+                                        onClick={() => {
+                                          handleResetearOportunidades(usuario)
+                                          closeDropdown()
+                                        }}
+                                        className="flex items-center w-full px-4 py-2 text-sm hover:bg-gray-100"
+                                        style={{ color: '#4d3930' }}
+                                      >
+                                        <span className="mr-2">🔄</span>
+                                        Resetear Oportunidades
+                                      </button>
+                                    )}
+                                    
+                                    <hr style={{ borderColor: '#b47b21', margin: '4px 0' }} />
+                                    
+                                    <button
+                                      onClick={() => {
+                                        handleDelete(usuario.identificacion)
+                                        closeDropdown()
+                                      }}
+                                      className="flex items-center w-full px-4 py-2 text-sm hover:bg-red-50"
+                                      style={{ color: '#d33' }}
+                                    >
+                                      <span className="mr-2">🗑️</span>
+                                      Eliminar Usuario
+                                    </button>
+                                  </div>
+                                </div>
                               )}
-                              <button
-                                onClick={() => handleDelete(usuario.identificacion)}
-                                className="btn btn-sm btn-outline"
-                                style={{ 
-                                  color: '#b47b21', 
-                                  borderColor: '#b47b21',
-                                  ':hover': { backgroundColor: '#b47b21', color: '#ffffff' }
-                                }}
-                              >
-                                🗑️ Eliminar
-                              </button>
                             </div>
                           </td>
                         </tr>

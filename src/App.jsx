@@ -10,6 +10,9 @@ import GestionPreguntas from './components/GestionPreguntas'
 import GestionUsuarios from './components/GestionUsuarios'
 import GestionCategorias from './components/GestionCategorias'
 import ConfiguracionPrueba from './components/ConfiguracionPrueba'
+import ProfesorDashboard from './components/ProfesorDashboard'
+import ProfesorGestionPreguntas from './components/ProfesorGestionPreguntas'
+import ProfesorGestionEstudiantes from './components/ProfesorGestionEstudiantes'
 import ThemeToggle from './components/ThemeToggle'
 
 function App() {
@@ -62,7 +65,9 @@ function App() {
               element={
                 <ProtectedRoute requiredRoles={['Profesor']}>
                   <Routes>
-                    <Route path="dashboard" element={<div>Dashboard Profesor (Próximamente)</div>} />
+                    <Route path="dashboard" element={<ProfesorDashboard />} />
+                    <Route path="gestion-preguntas" element={<ProfesorGestionPreguntas />} />
+                    <Route path="gestion-estudiantes" element={<ProfesorGestionEstudiantes />} />
                     <Route path="*" element={<Navigate to="dashboard" replace />} />
                   </Routes>
                 </ProtectedRoute>

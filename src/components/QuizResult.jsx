@@ -19,6 +19,9 @@ const QuizResult = () => {
   const [informacionInstitucional, setInformacionInstitucional] = useState(null)
   const [quizConfig, setQuizConfig] = useState(null)
   const [intentosUsados, setIntentosUsados] = useState(0)
+  const [timeUsed, setTimeUsed] = useState(0)
+  const [timeLimit, setTimeLimit] = useState(0)
+  const [categoriaEstudiante, setCategoriaEstudiante] = useState('')
 
   // Paleta de colores del sistema
   const colors = {
@@ -38,6 +41,7 @@ const QuizResult = () => {
   useEffect(() => {
     if (userInfo?.identificacion) {
       loadIntentosUsados().then(count => setIntentosUsados(count));
+      loadCategoriaEstudiante();
     }
   }, [userInfo?.identificacion])
 
@@ -59,6 +63,14 @@ const QuizResult = () => {
     if (quizState) {
       setQuizData(quizState)
       calculateScore(quizState.answers, quizState.questions)
+      
+      // Extraer información de tiempo
+      if (quizState.timeUsed !== undefined) {
+        setTimeUsed(quizState.timeUsed)
+      }
+      if (quizState.timeLeft !== undefined) {
+        setTimeLimit(quizState.timeLeft)
+      }
     } else {
       // Si no hay datos, redirigir al dashboard
       navigate('/estudiante/dashboard')
@@ -128,6 +140,32 @@ const QuizResult = () => {
     }
   };
 
+  const loadCategoriaEstudiante = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('usuario_categorias')
+        .select('categoria')
+        .eq('usuario_id', userInfo.identificacion)
+        .eq('activa', true)
+        .single();
+
+      if (error) {
+        console.error('Error cargando categoría del estudiante:', error);
+        setCategoriaEstudiante('Secretariado Ejecutivo'); // Fallback
+        return;
+      }
+
+      if (data?.categoria) {
+        setCategoriaEstudiante(data.categoria);
+      } else {
+        setCategoriaEstudiante('Secretariado Ejecutivo'); // Fallback
+      }
+    } catch (error) {
+      console.error('Error en loadCategoriaEstudiante:', error);
+      setCategoriaEstudiante('Secretariado Ejecutivo'); // Fallback
+    }
+  };
+
   const handleLogout = async () => {
     await logout()
     navigate('/login')
@@ -157,6 +195,19 @@ const QuizResult = () => {
     return '📚'
   }
 
+  const formatTime = (seconds) => {
+    const minutes = Math.floor(seconds / 60)
+    const remainingSeconds = seconds % 60
+    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`
+  }
+
+  const getTotalTimeLimit = () => {
+    if (quizConfig?.tiempo_limite_minutos) {
+      return quizConfig.tiempo_limite_minutos * 60
+    }
+    return timeLimit + timeUsed
+  }
+
   if (loading) {
     return <LoadingSpinner text="Cargando resultados..." />
   }
@@ -179,7 +230,7 @@ const QuizResult = () => {
         <div className="navbar py-2">
           <div className="flex-1">
             <h1 className="text-lg font-bold" style={{ color: colors.white }}>
-              🎓 {informacionInstitucional?.nombre_centro_educativo || 'Centro Educativo'} | {informacionInstitucional?.nombre_especialidad || 'Secretariado Ejecutivo'}
+              🎓 {informacionInstitucional?.nombre_centro_educativo || 'Centro Educativo'} | {categoriaEstudiante || informacionInstitucional?.nombre_especialidad || 'Secretariado Ejecutivo'}
             </h1>
           </div>
           <div className="flex-none">
@@ -203,7 +254,7 @@ const QuizResult = () => {
               {/* Título */}
               <div className="mb-4">
                 <h2 className="text-2xl font-bold mb-1" style={{ color: colors.white }}>Resultados de la Prueba</h2>
-                <p className="text-sm" style={{ color: colors.secondary }}>Evaluación de Conocimientos, Secretariado Ejecutivo</p>
+                <p className="text-sm" style={{ color: colors.secondary }}>Evaluación de Conocimientos, {categoriaEstudiante || 'Secretariado Ejecutivo'}</p>
               </div>
 
               {/* Información del Estudiante Compacta */}
@@ -220,59 +271,52 @@ const QuizResult = () => {
                 </div>
               </div>
 
-              {/* Puntuación Compacta */}
+              {/* Mensaje de Agradecimiento */}
               <div className="mb-4">
-                <div className="text-4xl font-bold mb-2" style={{ color: score >= 70 ? colors.secondary : colors.accent }}>
-                  {getScoreEmoji()}
+                <div className="text-4xl font-bold mb-2" style={{ color: colors.secondary }}>
+                  🙏
                 </div>
-                <div className="text-3xl font-bold mb-2 p-2 rounded-lg" style={{ 
+                <div className="text-2xl font-bold mb-2 p-3 rounded-lg" style={{ 
                   color: colors.white,
-                  backgroundColor: score >= 70 ? colors.secondary + '30' : colors.accent + '30',
-                  border: '2px solid ' + (score >= 70 ? colors.secondary : colors.accent)
+                  backgroundColor: colors.secondary + '30',
+                  border: '2px solid ' + colors.secondary
                 }}>
-                  {score}%
+                  ¡Gracias por completar la prueba!
                 </div>
                 <p className="text-sm mb-1" style={{ color: colors.white }}>
-                  {correctAnswers} de {totalQuestions} preguntas correctas
+                  Has respondido {totalQuestions} preguntas
                 </p>
                 <p className="text-xs" style={{ color: colors.secondary }}>
-                  {getScoreMessage()}
+                  Los resultados han sido registrados en el sistema y serán evaluados por nuestro equipo académico.
                 </p>
               </div>
 
-              {/* Detalles del Quiz Compactos */}
+              {/* Información General de la Prueba */}
               <div className="rounded-xl p-3 mb-4" style={{ backgroundColor: colors.white + '05', backdropFilter: 'blur(10px)', border: '1px solid ' + colors.white + '10' }}>
-                <h3 className="text-lg font-bold mb-2" style={{ color: colors.white }}>Detalles de la Prueba</h3>
+                <h3 className="text-lg font-bold mb-2" style={{ color: colors.white }}>Información de la Prueba</h3>
                 <div className="grid grid-cols-3 gap-2 text-center">
                   <div className="p-2 rounded-lg" style={{ backgroundColor: colors.accent + '20', border: '1px solid ' + colors.accent + '40' }}>
                     <p className="text-lg font-bold" style={{ color: colors.white }}>{totalQuestions}</p>
-                    <p className="text-xs" style={{ color: colors.secondary }}>Total Preguntas</p>
+                    <p className="text-xs" style={{ color: colors.secondary }}>Preguntas</p>
                   </div>
                   <div className="p-2 rounded-lg" style={{ backgroundColor: colors.secondary + '20', border: '1px solid ' + colors.secondary + '40' }}>
-                    <p className="text-lg font-bold" style={{ color: colors.white }}>{correctAnswers}</p>
-                    <p className="text-xs" style={{ color: colors.secondary }}>Correctas</p>
+                    <p className="text-lg font-bold" style={{ color: colors.white }}>{formatTime(getTotalTimeLimit())}</p>
+                    <p className="text-xs" style={{ color: colors.secondary }}>Duración Total</p>
                   </div>
                   <div className="p-2 rounded-lg" style={{ backgroundColor: colors.accent + '20', border: '1px solid ' + colors.accent + '40' }}>
-                    <p className="text-lg font-bold" style={{ color: colors.white }}>{totalQuestions - correctAnswers}</p>
-                    <p className="text-xs" style={{ color: colors.secondary }}>Incorrectas</p>
+                    <p className="text-lg font-bold" style={{ color: colors.white }}>{formatTime(timeUsed)}</p>
+                    <p className="text-xs" style={{ color: colors.secondary }}>Tiempo Usado</p>
                   </div>
                 </div>
               </div>
 
-              {/* Mensaje de Estado Compacto */}
+              {/* Mensaje de Procesamiento */}
               <div className="rounded-xl p-3 mb-4" style={{ backgroundColor: colors.white + '05', backdropFilter: 'blur(10px)', border: '1px solid ' + colors.white + '10' }}>
                 <div className="text-center">
-                  {score >= 70 ? (
-                    <div style={{ color: colors.secondary }}>
-                      <p className="text-lg font-bold mb-1">✅ ¡APROBADO!</p>
-                      <p className="text-xs" style={{ color: colors.white }}>Has completado exitosamente la evaluación de admisión.</p>
-                    </div>
-                  ) : (
-                    <div style={{ color: colors.accent }}>
-                      <p className="text-lg font-bold mb-1">❌ NO APROBADO</p>
-                      <p className="text-xs" style={{ color: colors.white }}>Necesitas obtener al menos 70 puntos para ser admitido.</p>
-                    </div>
-                  )}
+                  <div style={{ color: colors.secondary }}>
+                    <p className="text-lg font-bold mb-1">📋 Prueba Completada</p>
+                    <p className="text-xs" style={{ color: colors.white }}>Tu evaluación ha sido enviada para revisión. Próximamente se publicarán los resultados, pregunta al Administrador.</p>
+                  </div>
                 </div>
               </div>
 

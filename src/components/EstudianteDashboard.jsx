@@ -5,6 +5,7 @@ import LoadingSpinner from './LoadingSpinner'
 import quizService from '../services/quizService'
 import { institucionService } from '../services/institucionService'
 import { supabase } from '../lib/supabaseConfig'
+import Swal from 'sweetalert2'
 
 const EstudianteDashboard = () => {
   const { user, logout, getUserInfo } = useAuth()
@@ -18,7 +19,7 @@ const EstudianteDashboard = () => {
   const [quizConfig, setQuizConfig] = useState(null)
   const [informacionInstitucional, setInformacionInstitucional] = useState(null)
   const [intentosUsados, setIntentosUsados] = useState(0)
-  const [intentosCompletados, setIntentosCompletados] = useState([])
+  const [categoriaEstudiante, setCategoriaEstudiante] = useState('')
 
   // Paleta de colores del sistema
   const colors = {
@@ -39,6 +40,7 @@ const EstudianteDashboard = () => {
       loadQuizConfig()
       loadInformacionInstitucional()
       loadIntentosUsados()
+      loadCategoriaEstudiante()
     } else {
       console.log('⏳ Esperando userInfo para cargar datos...');
     }
@@ -67,10 +69,42 @@ const EstudianteDashboard = () => {
       setLoading(true)
       const info = await getUserInfo()
       setUserInfo(info)
+      console.log('👤 Datos del usuario cargados:', info)
+      console.log('👤 Estado del usuario:', info?.estado)
+      console.log('👤 Identificación del usuario:', info?.identificacion)
     } catch (error) {
       console.error('Error cargando información del usuario:', error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const refreshUserStatus = async () => {
+    try {
+      console.log('🔄 Actualizando estado del usuario...')
+      const info = await getUserInfo()
+      setUserInfo(info)
+      console.log('✅ Estado actualizado:', info?.estado)
+      
+      // También actualizar la categoría
+      await loadCategoriaEstudiante()
+      
+      // Mostrar mensaje de confirmación
+      await Swal.fire({
+        icon: 'success',
+        title: 'Estado Actualizado',
+        text: `Tu estado actual es: ${info?.estado || 'Desconocido'}`,
+        timer: 2000,
+        showConfirmButton: false
+      })
+    } catch (error) {
+      console.error('Error actualizando estado del usuario:', error)
+      await Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: 'No se pudo actualizar el estado del usuario',
+        confirmButtonColor: '#b47b21'
+      })
     }
   }
 
@@ -127,6 +161,34 @@ const EstudianteDashboard = () => {
     }
   };
 
+  const loadCategoriaEstudiante = async () => {
+    try {
+      if (!userInfo?.identificacion) return
+      
+      const { data, error } = await supabase
+        .from('usuario_categorias')
+        .select('categoria')
+        .eq('usuario_id', userInfo.identificacion)
+        .eq('activa', true)
+        .single()
+
+      if (error) {
+        console.error('Error cargando categoría del estudiante:', error)
+        setCategoriaEstudiante('Secretariado Ejecutivo') // Fallback
+        return
+      }
+
+      if (data?.categoria) {
+        setCategoriaEstudiante(data.categoria)
+      } else {
+        setCategoriaEstudiante('Secretariado Ejecutivo') // Fallback
+      }
+    } catch (error) {
+      console.error('Error en loadCategoriaEstudiante:', error)
+      setCategoriaEstudiante('Secretariado Ejecutivo') // Fallback
+    }
+  }
+
   const loadIntentosUsados = async () => {
     try {
       if (!userInfo?.identificacion) {
@@ -136,54 +198,60 @@ const EstudianteDashboard = () => {
 
       console.log('🔍 Buscando intentos para:', userInfo.identificacion);
       
-      // Consulta directa y simple
+      // Consulta simple solo para contar intentos completados
       const { data, error } = await supabase
         .from('intentos_quiz')
-        .select('id, estudiante_id, fecha_inicio, fecha_fin, puntuacion_total')
+        .select('id')
         .eq('estudiante_id', userInfo.identificacion)
         .not('fecha_fin', 'is', null);
 
       if (error) {
         console.error('❌ Error cargando intentos:', error);
-        console.error('❌ Detalles del error:', {
-          message: error.message,
-          details: error.details,
-          hint: error.hint
-        });
         setIntentosUsados(0);
-        setIntentosCompletados([]);
         return;
       }
 
-      console.log('📊 Intentos encontrados en BD:', data);
-      console.log('📊 Cantidad de intentos:', data.length);
+      console.log('📊 Intentos encontrados en BD:', data.length);
+      setIntentosUsados(data.length);
       
-      // Ordenar por fecha_inicio (más recientes primero)
-      const sortedData = data.sort((a, b) => new Date(b.fecha_inicio) - new Date(a.fecha_inicio));
-      
-      // Verificar que cada intento tenga puntuacion_total
-      sortedData.forEach((intento, index) => {
-        console.log(`📊 Intento ${index + 1}:`, {
-          id: intento.id,
-          fecha_inicio: intento.fecha_inicio,
-          fecha_fin: intento.fecha_fin,
-          puntuacion_total: intento.puntuacion_total
-        });
-      });
-      
-      setIntentosUsados(sortedData.length);
-      setIntentosCompletados(sortedData);
-      
-      console.log('✅ Estado actualizado - intentosUsados:', sortedData.length);
+      console.log('✅ Estado actualizado - intentosUsados:', data.length);
     } catch (error) {
       console.error('❌ Error en loadIntentosUsados:', error);
       setIntentosUsados(0);
-      setIntentosCompletados([]);
     }
   };
 
   const handleStartQuiz = () => {
-    // Navegar al quiz
+    // Validar que el estudiante esté activo
+    if (userInfo?.estado !== 'Activo') {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Acceso Restringido',
+        html: `
+          <div style="text-align: left;">
+            <p><strong>Tu cuenta no está activa para realizar la prueba.</strong></p>
+            <br>
+            <p><strong>Estado actual:</strong> ${userInfo?.estado || 'Inactivo'}</p>
+            <br>
+            <p><strong>Para activar tu cuenta:</strong></p>
+            <ul style="margin-left: 20px;">
+              <li>Comunícate con el Administrador del sistema</li>
+              <li>Proporciona tu identificación: <strong>${userInfo?.identificacion || 'N/A'}</strong></li>
+              <li>Espera a que se active tu cuenta</li>
+            </ul>
+            <br>
+            <p><strong>Una vez activada, podrás realizar la prueba de admisión.</strong></p>
+          </div>
+        `,
+        confirmButtonText: 'Entendido',
+        confirmButtonColor: '#b47b21',
+        background: '#ffffff',
+        color: '#4d3930'
+      })
+      return
+    }
+
+    // Si está activo, proceder al quiz
     navigate('/estudiante/quiz')
   }
 
@@ -290,7 +358,7 @@ const EstudianteDashboard = () => {
         <div className="navbar py-2">
           <div className="flex-1">
             <h1 className="text-lg font-bold" style={{ color: colors.white }}>
-              🎓 {informacionInstitucional?.nombre_centro_educativo || 'Centro Educativo'} | {informacionInstitucional?.nombre_especialidad || 'Secretariado Ejecutivo'}
+              🎓 Vocacional Monseñor Sanabria | {categoriaEstudiante || 'Secretariado Ejecutivo'}
             </h1>
           </div>
           <div className="flex-none">
@@ -354,6 +422,7 @@ const EstudianteDashboard = () => {
                       {intentosUsados}
                     </span>
                   </div>
+                  
                 </div>
               </div>
             </div>
@@ -422,47 +491,6 @@ const EstudianteDashboard = () => {
             </div>
           </div>
 
-          {/* Historial de Intentos */}
-          {intentosCompletados.length > 0 && (
-            <div className="card shadow-2xl mb-8" style={{ backgroundColor: colors.white + '10', backdropFilter: 'blur(10px)', border: '1px solid ' + colors.accent + '40' }}>
-              <div className="card-body">
-                <h2 className="card-title text-2xl justify-center mb-6" style={{ color: colors.white }}>
-                  📊 Historial de Intentos
-                </h2>
-                
-                <div className="space-y-3">
-                  {intentosCompletados.map((intento, index) => (
-                    <div key={intento.id} className="flex justify-between items-center p-4 rounded-lg" style={{ backgroundColor: colors.white + '05', border: '1px solid ' + colors.white + '10' }}>
-                      <div className="flex items-center space-x-4">
-                        <span className="text-xl font-bold" style={{ color: colors.secondary }}>#{index + 1}</span>
-                        <div>
-                          <p className="text-sm font-semibold" style={{ color: colors.white }}>
-                            {new Date(intento.fecha_inicio).toLocaleDateString('es-ES')} - {new Date(intento.fecha_inicio).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
-                          </p>
-                          <p className="text-xs" style={{ color: colors.secondary }}>
-                            📅 {new Date(intento.fecha_fin).toLocaleDateString('es-ES')} - {new Date(intento.fecha_fin).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-center">
-                          <span className={`badge text-xl px-6 py-3 font-bold ${intento.puntuacion_total >= 70 ? 'badge-success' : 'badge-error'}`} style={{ 
-                            backgroundColor: intento.puntuacion_total >= 70 ? colors.secondary : colors.accent,
-                            color: colors.white
-                          }}>
-                            {intento.puntuacion_total || 0}%
-                          </span>
-                          <p className="text-xs mt-2 font-semibold" style={{ color: colors.secondary }}>
-                            {intento.puntuacion_total >= 70 ? '✅ Aprobado' : '❌ No Aprobado'}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
 
 
 
@@ -473,7 +501,7 @@ const EstudianteDashboard = () => {
                 {quizStatusLoading ? (
                   <LoadingSpinner text="Verificando estado del quiz..." />
                 ) : quizStatus ? (
-                  quizStatus.canTake && !seAgotaronIntentos ? (
+                  quizStatus.canTake && !seAgotaronIntentos && userInfo?.estado === 'Activo' ? (
                     <>
                       <div className="flex gap-4 justify-center">
                         <button
@@ -496,6 +524,44 @@ const EstudianteDashboard = () => {
                       <p className="mt-4 text-sm" style={{ color: colors.secondary }}>
                         Haz clic en el botón cuando estés listo para comenzar
                       </p>
+                    </>
+                  ) : userInfo?.estado !== 'Activo' ? (
+                    <>
+                      <div className="alert p-4 rounded-lg max-w-lg mx-auto mb-4" style={{ backgroundColor: '#fef3c7', border: '1px solid #f59e0b' }}>
+                        <div className="flex items-start space-x-3">
+                          <span className="text-2xl">⚠️</span>
+                          <div>
+                            <h3 className="font-bold text-lg" style={{ color: '#92400e' }}>Cuenta Inactiva</h3>
+                            <p className="text-sm mt-1" style={{ color: '#92400e' }}>
+                              Tu cuenta no está activa para realizar la prueba de admisión.
+                            </p>
+                            <p className="text-sm mt-2" style={{ color: '#92400e' }}>
+                              <strong>Estado:</strong> {userInfo?.estado || 'Inactivo'}
+                            </p>
+                            <p className="text-sm mt-2" style={{ color: '#92400e' }}>
+                              <strong>Para activar tu cuenta:</strong> Comunícate con el Administrador del sistema.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="flex gap-4 justify-center">
+                        <button
+                          onClick={refreshUserStatus}
+                          className="btn btn-lg border-0 font-bold text-xl px-8 py-4 rounded-2xl shadow-2xl hover:shadow-3xl transition-all duration-300 transform hover:scale-105"
+                          style={{ backgroundColor: colors.secondary, color: colors.white }}
+                        >
+                          🔄 Actualizar Estado
+                        </button>
+                        
+                        <button
+                          onClick={handleLogout}
+                          className="btn btn-lg border-0 font-bold text-xl px-8 py-4 rounded-2xl shadow-2xl hover:shadow-3xl transition-all duration-300 transform hover:scale-105"
+                          style={{ backgroundColor: colors.accent, color: colors.white }}
+                        >
+                          🚪 Cerrar Sesión
+                        </button>
+                      </div>
                     </>
                   ) : seAgotaronIntentos ? (
                     <>
@@ -526,7 +592,6 @@ const EstudianteDashboard = () => {
           {/* Información Adicional */}
           <div className="mt-12 text-center text-sm" style={{ color: colors.secondary }}>
             <p>¿Tienes dudas? Contacta al administrador del sistema</p>
-            <p className="mt-2">© 2025 Sistema de Admisión - Desarrollado por Arakary Solutions</p>
           </div>
         </div>
       </div>
