@@ -83,6 +83,25 @@ const GestionPreguntas = () => {
     try {
       setLoading(true)
       
+      // Mostrar indicador de progreso
+      Swal.fire({
+        title: 'Cargando preguntas...',
+        text: 'Por favor espera mientras se cargan las preguntas',
+        allowOutsideClick: false,
+        allowEscapeKey: false,
+        showConfirmButton: false,
+        didOpen: () => {
+          Swal.showLoading()
+        },
+        background: '#ffffff',
+        color: '#4d3930',
+        customClass: {
+          popup: 'swal2-popup-custom',
+          title: 'swal2-title-custom',
+          content: 'swal2-content-custom'
+        }
+      })
+      
       // Cargar preguntas
       const { data: preguntasData, error: preguntasError } = await supabase
         .from('preguntas_quiz')
@@ -103,8 +122,12 @@ const GestionPreguntas = () => {
       setOpciones(opcionesData || [])
     } catch (error) {
       console.error('Error cargando preguntas:', error)
+      // Cerrar indicador de progreso en caso de error
+      Swal.close()
     } finally {
       setLoading(false)
+      // Cerrar indicador de progreso
+      Swal.close()
     }
   }
 
@@ -267,7 +290,28 @@ const GestionPreguntas = () => {
       }
 
       console.log('🎉 ¡Pregunta guardada exitosamente!')
+      
+      // Actualizar la lista primero
       await loadPreguntas()
+      
+      // Mostrar mensaje de éxito
+      await Swal.fire({
+        title: editingPregunta ? '¡Pregunta Actualizada!' : '¡Pregunta Creada!',
+        text: editingPregunta ? 'La pregunta ha sido actualizada exitosamente.' : 'La pregunta ha sido creada exitosamente.',
+        icon: 'success',
+        confirmButtonText: 'Entendido',
+        confirmButtonColor: '#f97316',
+        background: '#ffffff',
+        color: '#4d3930',
+        customClass: {
+          popup: 'swal2-popup-custom',
+          title: 'swal2-title-custom',
+          content: 'swal2-content-custom',
+          confirmButton: 'swal2-confirm-custom'
+        }
+      })
+      
+      // Cerrar formulario después del mensaje
       resetForm()
     } catch (error) {
       console.error('❌ Error guardando pregunta:', error)
@@ -359,7 +403,25 @@ const GestionPreguntas = () => {
 
       if (preguntaError) throw preguntaError
 
+      // Actualizar la lista primero
       await loadPreguntas()
+      
+      // Mostrar mensaje de éxito
+      await Swal.fire({
+        title: '¡Pregunta Eliminada!',
+        text: 'La pregunta ha sido eliminada exitosamente.',
+        icon: 'success',
+        confirmButtonText: 'Entendido',
+        confirmButtonColor: '#f97316',
+        background: '#ffffff',
+        color: '#4d3930',
+        customClass: {
+          popup: 'swal2-popup-custom',
+          title: 'swal2-title-custom',
+          content: 'swal2-content-custom',
+          confirmButton: 'swal2-confirm-custom'
+        }
+      })
     } catch (error) {
       console.error('Error eliminando pregunta:', error)
       Swal.fire({
