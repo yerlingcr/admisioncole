@@ -165,17 +165,22 @@ const GestionPreguntas = () => {
 
       if (editingPregunta) {
         console.log('✏️ Editando pregunta existente...')
+        console.log('🆔 ID de pregunta a editar:', editingPregunta.id)
+        
+        const updateData = {
+          pregunta: formData.pregunta,
+          imagen_url: formData.imagen_url || null,
+          categoria: formData.categoria,
+          nivel_dificultad: formData.nivel_dificultad,
+          orden_mostrar: formData.orden_mostrar
+        }
+        
+        console.log('📤 Datos de actualización:', updateData)
+        
         // Actualizar pregunta existente
         const { data: preguntaData, error: preguntaError } = await supabase
           .from('preguntas_quiz')
-          .update({
-            pregunta: formData.pregunta,
-            imagen_url: formData.imagen_url || null,
-            categoria: formData.categoria,
-            nivel_dificultad: formData.nivel_dificultad,
-            orden_mostrar: formData.orden_mostrar,
-            fecha_modificacion: new Date().toISOString()
-          })
+          .update(updateData)
           .eq('id', editingPregunta.id)
           .select()
 
