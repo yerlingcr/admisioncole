@@ -69,10 +69,27 @@ const Reportes = () => {
         return
       }
 
+      // Obtener configuración del quiz para calcular puntos correctos
+      const { data: configQuiz, error: errorConfig } = await supabase
+        .from('configuracion_quiz')
+        .select('total_preguntas, puntaje_por_pregunta')
+        .eq('activa', true)
+        .single()
+
+      if (errorConfig) {
+        console.error('❌ Error obteniendo configuración del quiz:', errorConfig)
+      }
+
+      const totalPreguntas = configQuiz?.total_preguntas || 5
+      const puntajePorPregunta = configQuiz?.puntaje_por_pregunta || 20
+
       // Obtener información de usuarios para cada intento
       const datosProcesados = await Promise.all(
         intentos.map(async (intento) => {
           try {
+            // Calcular preguntas correctas
+            const preguntasCorrectas = Math.round((intento.puntuacion_total / 100) * totalPreguntas)
+
             // Obtener datos del usuario
             const { data: usuario, error: errorUsuario } = await supabase
               .from('usuarios')
@@ -109,6 +126,7 @@ const Reportes = () => {
               nombre: usuario.nombre,
               apellidos: `${usuario.primer_apellido || ''} ${usuario.segundo_apellido || ''}`.trim(),
               notaObtenida: intento.puntuacion_total,
+              preguntasCorrectas: preguntasCorrectas,
               categoria: categoria,
               estado: usuario.estado,
               fechaRealizacion: new Date(intento.fecha_fin).toLocaleDateString('es-CR'),
@@ -170,6 +188,7 @@ const Reportes = () => {
         'Nombre': item.nombre,
         'Apellidos': item.apellidos,
         'Nota Obtenida': item.notaObtenida,
+        'Puntos Obtenidos': item.preguntasCorrectas,
         'Categoría': item.categoria,
         'Estado': item.estado,
         'Fecha de Realización': item.fechaRealizacion,
@@ -186,6 +205,7 @@ const Reportes = () => {
         { wch: 20 }, // Nombre
         { wch: 25 }, // Apellidos
         { wch: 12 }, // Nota Obtenida
+        { wch: 15 }, // Puntos Obtenidos
         { wch: 20 }, // Categoría
         { wch: 10 }, // Estado
         { wch: 15 }, // Fecha
@@ -233,6 +253,7 @@ const Reportes = () => {
         item.nombre,
         item.apellidos,
         item.notaObtenida,
+        item.preguntasCorrectas,
         item.categoria,
         item.fechaRealizacion
       ])
@@ -240,7 +261,7 @@ const Reportes = () => {
       // Generar tabla
       doc.autoTable({
         startY: 45,
-        head: [['Identificación', 'Nombre', 'Apellidos', 'Nota', 'Categoría', 'Fecha']],
+        head: [['Identificación', 'Nombre', 'Apellidos', 'Nota', 'Puntos Obtenidos', 'Categoría', 'Fecha']],
         body: datosTabla,
         styles: {
           fontSize: 8,
@@ -261,8 +282,9 @@ const Reportes = () => {
           1: { halign: 'left', cellWidth: 30 },   // Nombre
           2: { halign: 'left', cellWidth: 35 },   // Apellidos
           3: { halign: 'center', cellWidth: 15 }, // Nota
-          4: { halign: 'center', cellWidth: 30 }, // Categoría
-          5: { halign: 'center', cellWidth: 25 }  // Fecha
+          4: { halign: 'center', cellWidth: 20 }, // Puntos Obtenidos
+          5: { halign: 'center', cellWidth: 30 }, // Categoría
+          6: { halign: 'center', cellWidth: 25 }  // Fecha
         },
         margin: { left: 20, right: 20 },
         pageBreak: 'auto'
@@ -446,6 +468,7 @@ const Reportes = () => {
                     <th>Nombre</th>
                     <th>Apellidos</th>
                     <th>Nota</th>
+                    <th>Puntos Obtenidos</th>
                     <th>Categoría</th>
                     <th>Fecha</th>
                     <th>Estado</th>
@@ -461,7 +484,12 @@ const Reportes = () => {
                         <span className={`badge ${
                           item.notaObtenida >= 70 ? 'badge-success' : 'badge-error'
                         }`}>
-                          {item.notaObtenida}%
+                          {item.notaObtenida}
+                        </span>
+                      </td>
+                      <td>
+                        <span className="badge badge-info">
+                          {item.preguntasCorrectas}
                         </span>
                       </td>
                       <td>
