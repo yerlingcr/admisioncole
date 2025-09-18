@@ -6,6 +6,7 @@ import storageService from '../services/storageService'
 import LoadingSpinner from './LoadingSpinner'
 import ThemeToggle from './ThemeToggle'
 import usuarioCategoriasService from '../services/usuarioCategoriasService'
+import Swal from 'sweetalert2'
 
 const GestionPreguntas = () => {
   const { user, logout } = useAuth()
@@ -253,7 +254,15 @@ const GestionPreguntas = () => {
         hint: error.hint,
         code: error.code
       })
-      alert(`Error guardando la pregunta: ${error.message}\n\nPor favor, revisa la consola para más detalles.`)
+      Swal.fire({
+        title: 'Error',
+        text: `Error guardando la pregunta: ${error.message}`,
+        icon: 'error',
+        confirmButtonText: 'Entendido',
+        confirmButtonColor: '#b47b21',
+        background: '#ffffff',
+        color: '#4d3930'
+      })
     } finally {
       setLoading(false)
     }
@@ -281,7 +290,30 @@ const GestionPreguntas = () => {
   }
 
   const handleDelete = async (preguntaId) => {
-    if (!confirm('¿Estás seguro de que quieres eliminar esta pregunta? Esta acción no se puede deshacer.')) {
+    const result = await Swal.fire({
+      title: '¿Eliminar pregunta?',
+      text: '¿Estás seguro de que quieres eliminar esta pregunta? Esta acción no se puede deshacer.',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#dc3545',
+      cancelButtonColor: '#6c757d',
+      confirmButtonText: 'Sí, eliminar',
+      cancelButtonText: 'Cancelar',
+      background: '#ffffff',
+      color: '#4d3930',
+      customClass: {
+        popup: 'swal2-popup-custom',
+        title: 'swal2-title-custom',
+        content: 'swal2-content-custom',
+        confirmButton: 'swal2-confirm-custom',
+        cancelButton: 'swal2-cancel-custom'
+      },
+      buttonsStyling: true,
+      allowOutsideClick: false,
+      allowEscapeKey: false
+    })
+
+    if (!result.isConfirmed) {
       return
     }
 
@@ -307,7 +339,15 @@ const GestionPreguntas = () => {
       await loadPreguntas()
     } catch (error) {
       console.error('Error eliminando pregunta:', error)
-      alert('Error eliminando la pregunta. Por favor, intenta de nuevo.')
+      Swal.fire({
+        title: 'Error',
+        text: 'Error eliminando la pregunta. Por favor, intenta de nuevo.',
+        icon: 'error',
+        confirmButtonText: 'Entendido',
+        confirmButtonColor: '#b47b21',
+        background: '#ffffff',
+        color: '#4d3930'
+      })
     } finally {
       setLoading(false)
     }
@@ -328,7 +368,15 @@ const GestionPreguntas = () => {
       setSelectedFile(file)
       setFormData(prev => ({ ...prev, imagen_url: '' })) // Limpiar URL si hay archivo
     } else {
-      alert(`Error en el archivo:\n${validation.errors.join('\n')}`)
+      Swal.fire({
+        title: 'Error en el archivo',
+        html: validation.errors.join('<br>'),
+        icon: 'error',
+        confirmButtonText: 'Entendido',
+        confirmButtonColor: '#b47b21',
+        background: '#ffffff',
+        color: '#4d3930'
+      })
       if (fileInputRef.current) {
         fileInputRef.current.value = '' // Limpiar input
       }
@@ -387,7 +435,15 @@ const GestionPreguntas = () => {
       }
     } catch (error) {
       console.error('❌ Error subiendo imagen:', error)
-      alert(`Error subiendo imagen: ${error.message}`)
+      Swal.fire({
+        title: 'Error subiendo imagen',
+        text: `Error subiendo imagen: ${error.message}`,
+        icon: 'error',
+        confirmButtonText: 'Entendido',
+        confirmButtonColor: '#b47b21',
+        background: '#ffffff',
+        color: '#4d3930'
+      })
     } finally {
       setUploadingImage(false)
     }

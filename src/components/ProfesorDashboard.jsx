@@ -20,6 +20,8 @@ const ProfesorDashboard = () => {
   })
   const [preguntasCategoria, setPreguntasCategoria] = useState([])
   const [estudiantesCategoria, setEstudiantesCategoria] = useState([])
+  const [notasEstudiantes, setNotasEstudiantes] = useState([])
+  const [loadingNotas, setLoadingNotas] = useState(false)
 
   useEffect(() => {
     loadUserInfo()
@@ -28,6 +30,7 @@ const ProfesorDashboard = () => {
   useEffect(() => {
     if (categoriaAsignada && userInfo) {
       loadEstadisticas(categoriaAsignada)
+      loadNotasEstudiantes()
     }
   }, [categoriaAsignada, userInfo])
 
@@ -154,6 +157,95 @@ const ProfesorDashboard = () => {
       setEstudiantesCategoria(estudiantesCategoria)
     } catch (error) {
       console.error('Error cargando estadísticas:', error)
+    }
+  }
+
+  const loadNotasEstudiantes = async () => {
+    if (!categoriaAsignada) return
+    
+    try {
+      setLoadingNotas(true)
+      console.log('📊 Cargando notas de estudiantes para categoría:', categoriaAsignada)
+      
+      // Obtener puntuación mínima de configuración
+      const { data: config, error: configError } = await supabase
+        .from('configuracion_quiz')
+        .select('puntuacion_minima_aprobacion')
+        .eq('activa', true)
+        .single()
+      
+      const puntuacionMinima = config?.puntuacion_minima_aprobacion || 70
+      console.log('📊 Puntuación mínima para aprobar:', puntuacionMinima)
+      
+      // Obtener estudiantes de la categoría del profesor
+      const { data: estudiantesCategoria, error: errorEstudiantes } = await supabase
+        .from('usuario_categorias')
+        .select(`
+          usuario_id,
+          usuarios!inner(identificacion, nombre, primer_apellido, segundo_apellido, rol)
+        `)
+        .eq('categoria', categoriaAsignada)
+        .eq('activa', true)
+        .eq('usuarios.rol', 'Estudiante')
+
+      if (errorEstudiantes) {
+        console.error('❌ Error cargando estudiantes:', errorEstudiantes)
+        return
+      }
+
+      console.log('👥 Estudiantes encontrados:', estudiantesCategoria?.length || 0)
+
+      if (!estudiantesCategoria || estudiantesCategoria.length === 0) {
+        setNotasEstudiantes([])
+        return
+      }
+
+      // Obtener intentos de los estudiantes
+      const estudianteIds = estudiantesCategoria.map(e => e.usuario_id)
+      const { data: intentos, error: errorIntentos } = await supabase
+        .from('intentos_quiz')
+        .select('estudiante_id, puntuacion_total, fecha_fin')
+        .in('estudiante_id', estudianteIds)
+        .not('fecha_fin', 'is', null)
+        .not('puntuacion_total', 'is', null)
+
+      if (errorIntentos) {
+        console.error('❌ Error cargando intentos:', errorIntentos)
+        return
+      }
+
+      console.log('📝 Intentos encontrados:', intentos?.length || 0)
+
+      // Procesar datos para obtener la mejor nota de cada estudiante
+      const notasConEstudiantes = estudiantesCategoria.map(estudiante => {
+        const intentosEstudiante = intentos?.filter(i => i.estudiante_id === estudiante.usuario_id) || []
+        
+        // Obtener la mejor puntuación del estudiante
+        const mejorIntento = intentosEstudiante.reduce((mejor, actual) => {
+          return actual.puntuacion_total > mejor.puntuacion_total ? actual : mejor
+        }, { puntuacion_total: 0 })
+
+        return {
+          identificacion: estudiante.usuarios.identificacion,
+          nombre: estudiante.usuarios.nombre,
+          primer_apellido: estudiante.usuarios.primer_apellido,
+          segundo_apellido: estudiante.usuarios.segundo_apellido,
+          notaObtenida: mejorIntento.puntuacion_total || 0,
+          intentosRealizados: intentosEstudiante.length,
+          puntuacionMinima: puntuacionMinima
+        }
+      })
+
+      // Ordenar por nota obtenida (mayor a menor)
+      notasConEstudiantes.sort((a, b) => b.notaObtenida - a.notaObtenida)
+
+      setNotasEstudiantes(notasConEstudiantes)
+      console.log('📊 Notas cargadas:', notasConEstudiantes)
+      
+    } catch (error) {
+      console.error('❌ Error cargando notas:', error)
+    } finally {
+      setLoadingNotas(false)
     }
   }
 
@@ -404,6 +496,136 @@ const ProfesorDashboard = () => {
             </div>
           </div>
         </div>
+
+        {/* Sección de Notas de Estudiantes */}
+        {categoriaAsignada && (
+          <div className="mt-8">
+            <div className="card bg-white border border-gray-300 shadow-lg">
+              <div className="card-body">
+                <div className="flex justify-between items-center mb-6">
+                  <h2 className="card-title text-xl text-gray-800">
+                    📊 Notas de Estudiantes - "{typeof categoriaAsignada === 'string' ? categoriaAsignada : categoriaAsignada.nombre}"
+                  </h2>
+                  <button
+                    onClick={loadNotasEstudiantes}
+                    className="btn btn-sm btn-outline"
+                    disabled={loadingNotas}
+                  >
+                    {loadingNotas ? (
+                      <>
+                        <span className="loading loading-spinner loading-xs"></span>
+                        Cargando...
+                      </>
+                    ) : (
+                      <>
+                        🔄 Actualizar
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                {loadingNotas ? (
+                  <div className="flex justify-center items-center py-8">
+                    <span className="loading loading-spinner loading-lg"></span>
+                    <span className="ml-2">Cargando notas...</span>
+                  </div>
+                ) : notasEstudiantes.length > 0 ? (
+                  <div className="overflow-x-auto">
+                    <table className="table table-zebra w-full">
+                      <thead>
+                        <tr>
+                          <th className="text-gray-700 font-semibold">#</th>
+                          <th className="text-gray-700 font-semibold">Identificación</th>
+                          <th className="text-gray-700 font-semibold">Nombre</th>
+                          <th className="text-gray-700 font-semibold">Apellidos</th>
+                          <th className="text-gray-700 font-semibold">Nota Obtenida</th>
+                          <th className="text-gray-700 font-semibold">Estado</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {notasEstudiantes.map((estudiante, index) => (
+                          <tr key={estudiante.identificacion}>
+                            <td className="font-medium text-gray-600">
+                              {index + 1}
+                            </td>
+                            <td className="font-medium text-gray-800">
+                              {estudiante.identificacion}
+                            </td>
+                            <td className="text-gray-700">
+                              {estudiante.nombre}
+                            </td>
+                            <td className="text-gray-700">
+                              {estudiante.primer_apellido} {estudiante.segundo_apellido || ''}
+                            </td>
+                            <td>
+                              <span 
+                                className={`badge badge-lg font-bold ${
+                                  estudiante.notaObtenida > estudiante.puntuacionMinima 
+                                    ? 'badge-success' 
+                                    : 'badge-error'
+                                }`}
+                              >
+                                {estudiante.notaObtenida}%
+                              </span>
+                            </td>
+                            <td>
+                              <span 
+                                className={`badge badge-sm ${
+                                  estudiante.notaObtenida > estudiante.puntuacionMinima 
+                                    ? 'badge-success' 
+                                    : 'badge-error'
+                                }`}
+                              >
+                                {estudiante.notaObtenida > estudiante.puntuacionMinima 
+                                  ? '✅ Aprobado' 
+                                  : '❌ Reprobado'
+                                }
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <div className="text-gray-400 text-6xl mb-4">📝</div>
+                    <h3 className="text-lg font-semibold text-gray-600 mb-2">
+                      No hay notas disponibles
+                    </h3>
+                    <p className="text-gray-500">
+                      Los estudiantes de esta categoría aún no han completado la prueba.
+                    </p>
+                  </div>
+                )}
+
+                {notasEstudiantes.length > 0 && (
+                  <div className="mt-6 p-4 bg-gray-50 rounded-lg">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-center">
+                      <div>
+                        <div className="text-2xl font-bold text-green-600">
+                          {notasEstudiantes.filter(e => e.notaObtenida > e.puntuacionMinima).length}
+                        </div>
+                        <div className="text-sm text-gray-600">Aprobados</div>
+                      </div>
+                      <div>
+                        <div className="text-2xl font-bold text-red-600">
+                          {notasEstudiantes.filter(e => e.notaObtenida <= e.puntuacionMinima).length}
+                        </div>
+                        <div className="text-sm text-gray-600">Reprobados</div>
+                      </div>
+                    </div>
+                    <div className="mt-4 text-center">
+                      <p className="text-sm text-gray-500">
+                        Puntuación mínima para aprobar: <span className="font-semibold">{notasEstudiantes[0]?.puntuacionMinima || 70}%</span>
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Lista de Preguntas de la Categoría */}
         {categoriaAsignada && (

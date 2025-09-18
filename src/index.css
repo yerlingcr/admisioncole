@@ -1,3 +1,52 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Estilos personalizados para SweetAlert2 */
+.swal2-popup-custom {
+  border-radius: 12px !important;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2) !important;
+  border: 2px solid #b47b21 !important;
+}
+
+.swal2-title-custom {
+  color: #4d3930 !important;
+  font-weight: 600 !important;
+  font-size: 1.5rem !important;
+}
+
+.swal2-content-custom {
+  color: #4d3930 !important;
+  font-size: 1rem !important;
+}
+
+.swal2-confirm-custom {
+  background-color: #dc3545 !important;
+  border-color: #dc3545 !important;
+  border-radius: 8px !important;
+  font-weight: 500 !important;
+  padding: 10px 20px !important;
+}
+
+.swal2-confirm-custom:hover {
+  background-color: #c82333 !important;
+  border-color: #c82333 !important;
+}
+
+.swal2-cancel-custom {
+  background-color: #6c757d !important;
+  border-color: #6c757d !important;
+  border-radius: 8px !important;
+  font-weight: 500 !important;
+  padding: 10px 20px !important;
+}
+
+.swal2-cancel-custom:hover {
+  background-color: #5a6268 !important;
+  border-color: #5a6268 !important;
+}
+
+/* Estilos para el overlay */
+.swal2-backdrop-show {
+  background-color: rgba(0, 0, 0, 0.4) !important;
+}
