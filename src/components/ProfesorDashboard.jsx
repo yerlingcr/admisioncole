@@ -22,6 +22,7 @@ const ProfesorDashboard = () => {
   const [estudiantesCategoria, setEstudiantesCategoria] = useState([])
   const [notasEstudiantes, setNotasEstudiantes] = useState([])
   const [loadingNotas, setLoadingNotas] = useState(false)
+  const [busquedaNotas, setBusquedaNotas] = useState('')
 
   useEffect(() => {
     loadUserInfo()
@@ -158,6 +159,21 @@ const ProfesorDashboard = () => {
     } catch (error) {
       console.error('Error cargando estadísticas:', error)
     }
+  }
+
+  const getNotasFiltradas = () => {
+    if (!busquedaNotas.trim()) {
+      return notasEstudiantes
+    }
+    
+    const terminoBusqueda = busquedaNotas.toLowerCase()
+    return notasEstudiantes.filter(estudiante => 
+      estudiante.identificacion.toLowerCase().includes(terminoBusqueda) ||
+      estudiante.nombre.toLowerCase().includes(terminoBusqueda) ||
+      estudiante.primer_apellido.toLowerCase().includes(terminoBusqueda) ||
+      estudiante.segundo_apellido.toLowerCase().includes(terminoBusqueda) ||
+      `${estudiante.nombre} ${estudiante.primer_apellido} ${estudiante.segundo_apellido}`.toLowerCase().includes(terminoBusqueda)
+    )
   }
 
   const loadNotasEstudiantes = async () => {
@@ -544,12 +560,28 @@ const ProfesorDashboard = () => {
                   </button>
                 </div>
 
+                {/* Barra de búsqueda */}
+                <div className="mb-4">
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder="Buscar por identificación, nombre o apellidos..."
+                      value={busquedaNotas}
+                      onChange={(e) => setBusquedaNotas(e.target.value)}
+                      className="input input-bordered w-full pl-10 pr-4"
+                    />
+                    <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
+                      🔍
+                    </span>
+                  </div>
+                </div>
+
                 {loadingNotas ? (
                   <div className="flex justify-center items-center py-8">
                     <span className="loading loading-spinner loading-lg"></span>
                     <span className="ml-2">Cargando notas...</span>
                   </div>
-                ) : notasEstudiantes.length > 0 ? (
+                ) : getNotasFiltradas().length > 0 ? (
                   <div className="overflow-x-auto">
                     <table className="table table-zebra w-full">
                       <thead>
@@ -565,7 +597,7 @@ const ProfesorDashboard = () => {
                         </tr>
                       </thead>
                       <tbody>
-                        {notasEstudiantes.map((estudiante, index) => (
+                        {getNotasFiltradas().map((estudiante, index) => (
                           <tr key={estudiante.identificacion}>
                             <td className="font-medium text-gray-600">
                               {index + 1}
@@ -621,12 +653,17 @@ const ProfesorDashboard = () => {
                   </div>
                 ) : (
                   <div className="text-center py-8">
-                    <div className="text-gray-400 text-6xl mb-4">📝</div>
+                    <div className="text-gray-400 text-6xl mb-4">
+                      {busquedaNotas.trim() ? '🔍' : '📝'}
+                    </div>
                     <h3 className="text-lg font-semibold text-gray-600 mb-2">
-                      No hay notas disponibles
+                      {busquedaNotas.trim() ? 'No se encontraron resultados' : 'No hay notas disponibles'}
                     </h3>
                     <p className="text-gray-500">
-                      Los estudiantes de esta categoría aún no han completado la prueba.
+                      {busquedaNotas.trim() 
+                        ? `No hay estudiantes que coincidan con "${busquedaNotas}".`
+                        : 'Los estudiantes de esta categoría aún no han completado la prueba.'
+                      }
                     </p>
                   </div>
                 )}
