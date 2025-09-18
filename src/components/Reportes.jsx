@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabaseConfig'
 import * as XLSX from 'xlsx'
 import jsPDF from 'jspdf'
-import 'jspdf-autotable'
+import autoTable from 'jspdf-autotable'
 
 const Reportes = () => {
   const [loading, setLoading] = useState(false)
@@ -87,8 +87,10 @@ const Reportes = () => {
       const datosProcesados = await Promise.all(
         intentos.map(async (intento) => {
           try {
-            // Calcular preguntas correctas
+            // Calcular preguntas correctas (independiente del porcentaje de la categoría)
             const preguntasCorrectas = Math.round((intento.puntuacion_total / 100) * totalPreguntas)
+            // Inicializar porcentaje ponderado; se recalcula cuando tengamos porcentajePrueba
+            let porcentajePonderado = 0
 
             // Obtener datos del usuario
             const { data: usuario, error: errorUsuario } = await supabase
@@ -102,7 +104,7 @@ const Reportes = () => {
               return null
             }
 
-            // Obtener categoría del usuario
+            // Obtener categoría del usuario y su porcentaje
             const { data: categoriaData, error: errorCategoria } = await supabase
               .from('usuario_categorias')
               .select('categoria')
@@ -111,6 +113,20 @@ const Reportes = () => {
               .single()
 
             const categoria = categoriaData?.categoria || 'Sin categoría'
+
+            // Obtener porcentaje de la categoría (tolerante a no coincidencias)
+            const { data: categoriaInfoArr, error: errorCategoriaInfo } = await supabase
+              .from('categorias_quiz')
+              .select('porcentaje_prueba, nombre, id')
+              .eq('nombre', categoria)
+              .limit(1)
+
+            const porcentajePrueba = Array.isArray(categoriaInfoArr) && categoriaInfoArr.length > 0
+              ? (categoriaInfoArr[0]?.porcentaje_prueba || 0)
+              : 0
+
+            // Ahora sí: calcular porcentaje ponderado con el valor obtenido
+            porcentajePonderado = Math.round((intento.puntuacion_total * porcentajePrueba) / 100)
 
             // Aplicar filtros
             if (filtros.categoria !== 'todas' && categoria !== filtros.categoria) {
@@ -127,6 +143,7 @@ const Reportes = () => {
               apellidos: `${usuario.primer_apellido || ''} ${usuario.segundo_apellido || ''}`.trim(),
               notaObtenida: intento.puntuacion_total,
               preguntasCorrectas: preguntasCorrectas,
+              porcentajePonderado: porcentajePonderado,
               categoria: categoria,
               estado: usuario.estado,
               fechaRealizacion: new Date(intento.fecha_fin).toLocaleDateString('es-CR'),
@@ -189,6 +206,7 @@ const Reportes = () => {
         'Apellidos': item.apellidos,
         'Nota Obtenida': item.notaObtenida,
         'Puntos Obtenidos': item.preguntasCorrectas,
+        'Porcentaje Ponderado': item.porcentajePonderado,
         'Categoría': item.categoria,
         'Estado': item.estado,
         'Fecha de Realización': item.fechaRealizacion,
@@ -206,6 +224,7 @@ const Reportes = () => {
         { wch: 25 }, // Apellidos
         { wch: 12 }, // Nota Obtenida
         { wch: 15 }, // Puntos Obtenidos
+        { wch: 18 }, // Porcentaje Ponderado
         { wch: 20 }, // Categoría
         { wch: 10 }, // Estado
         { wch: 15 }, // Fecha
@@ -254,14 +273,15 @@ const Reportes = () => {
         item.apellidos,
         item.notaObtenida,
         item.preguntasCorrectas,
+        `${item.porcentajePonderado}%`,
         item.categoria,
         item.fechaRealizacion
       ])
 
       // Generar tabla
-      doc.autoTable({
+      autoTable(doc, {
         startY: 45,
-        head: [['Identificación', 'Nombre', 'Apellidos', 'Nota', 'Puntos Obtenidos', 'Categoría', 'Fecha']],
+        head: [['Identificación', 'Nombre', 'Apellidos', 'Nota', 'Puntos Obtenidos', '%', 'Categoría', 'Fecha']],
         body: datosTabla,
         styles: {
           fontSize: 8,
@@ -283,8 +303,9 @@ const Reportes = () => {
           2: { halign: 'left', cellWidth: 35 },   // Apellidos
           3: { halign: 'center', cellWidth: 15 }, // Nota
           4: { halign: 'center', cellWidth: 20 }, // Puntos Obtenidos
-          5: { halign: 'center', cellWidth: 30 }, // Categoría
-          6: { halign: 'center', cellWidth: 25 }  // Fecha
+          5: { halign: 'center', cellWidth: 15 }, // Porcentaje
+          6: { halign: 'center', cellWidth: 30 }, // Categoría
+          7: { halign: 'center', cellWidth: 25 }  // Fecha
         },
         margin: { left: 20, right: 20 },
         pageBreak: 'auto'
@@ -469,6 +490,7 @@ const Reportes = () => {
                     <th>Apellidos</th>
                     <th>Nota</th>
                     <th>Puntos Obtenidos</th>
+                    <th>%</th>
                     <th>Categoría</th>
                     <th>Fecha</th>
                     <th>Estado</th>
@@ -490,6 +512,11 @@ const Reportes = () => {
                       <td>
                         <span className="badge badge-info">
                           {item.preguntasCorrectas}
+                        </span>
+                      </td>
+                      <td>
+                        <span className="badge badge-warning">
+                          {item.porcentajePonderado}%
                         </span>
                       </td>
                       <td>

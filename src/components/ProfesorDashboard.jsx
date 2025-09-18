@@ -167,15 +167,30 @@ const ProfesorDashboard = () => {
       setLoadingNotas(true)
       console.log('📊 Cargando notas de estudiantes para categoría:', categoriaAsignada)
       
-      // Obtener puntuación mínima de configuración
+      // Obtener configuración activa (mínimo y total de preguntas)
       const { data: config, error: configError } = await supabase
         .from('configuracion_quiz')
-        .select('puntuacion_minima_aprobacion')
+        .select('puntuacion_minima_aprobacion, total_preguntas')
         .eq('activa', true)
         .single()
       
       const puntuacionMinima = config?.puntuacion_minima_aprobacion || 70
+      const totalPreguntas = config?.total_preguntas || 5
       console.log('📊 Puntuación mínima para aprobar:', puntuacionMinima)
+      console.log('🧮 Total de preguntas configuradas:', totalPreguntas)
+
+      // Obtener porcentaje de la prueba para la categoría
+      const nombreCategoria = typeof categoriaAsignada === 'string' ? categoriaAsignada : categoriaAsignada
+      const { data: categoriaInfo } = await supabase
+        .from('categorias_quiz')
+        .select('porcentaje_prueba')
+        .eq('nombre', nombreCategoria)
+        .limit(1)
+
+      const porcentajePrueba = Array.isArray(categoriaInfo) && categoriaInfo.length > 0
+        ? (categoriaInfo[0]?.porcentaje_prueba || 0)
+        : 0
+      console.log('📈 Porcentaje de la prueba para la categoría:', porcentajePrueba)
       
       // Obtener estudiantes de la categoría del profesor
       const { data: estudiantesCategoria, error: errorEstudiantes } = await supabase
@@ -225,12 +240,17 @@ const ProfesorDashboard = () => {
           return actual.puntuacion_total > mejor.puntuacion_total ? actual : mejor
         }, { puntuacion_total: 0 })
 
+        const puntosObtenidos = Math.round((mejorIntento.puntuacion_total / 100) * totalPreguntas)
+        const porcentajePonderado = Math.round((mejorIntento.puntuacion_total * porcentajePrueba) / 100)
+
         return {
           identificacion: estudiante.usuarios.identificacion,
           nombre: estudiante.usuarios.nombre,
           primer_apellido: estudiante.usuarios.primer_apellido,
           segundo_apellido: estudiante.usuarios.segundo_apellido,
           notaObtenida: mejorIntento.puntuacion_total || 0,
+          puntosObtenidos,
+          porcentajePonderado,
           intentosRealizados: intentosEstudiante.length,
           puntuacionMinima: puntuacionMinima
         }
@@ -539,6 +559,8 @@ const ProfesorDashboard = () => {
                           <th className="text-gray-700 font-semibold">Nombre</th>
                           <th className="text-gray-700 font-semibold">Apellidos</th>
                           <th className="text-gray-700 font-semibold">Nota Obtenida</th>
+                          <th className="text-gray-700 font-semibold">Puntos Obtenidos</th>
+                          <th className="text-gray-700 font-semibold">%</th>
                           <th className="text-gray-700 font-semibold">Estado</th>
                         </tr>
                       </thead>
@@ -565,7 +587,17 @@ const ProfesorDashboard = () => {
                                     : 'badge-error'
                                 }`}
                               >
-                                {estudiante.notaObtenida}%
+                                {estudiante.notaObtenida}
+                              </span>
+                            </td>
+                            <td>
+                              <span className="badge badge-info">
+                                {estudiante.puntosObtenidos}
+                              </span>
+                            </td>
+                            <td>
+                              <span className="badge badge-warning">
+                                {estudiante.porcentajePonderado}%
                               </span>
                             </td>
                             <td>
