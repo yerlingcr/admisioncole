@@ -174,8 +174,7 @@ const GestionPreguntas = () => {
             categoria: formData.categoria,
             nivel_dificultad: formData.nivel_dificultad,
             orden_mostrar: formData.orden_mostrar,
-            usuario_modificador: userInfo.identificacion,
-            updated_at: new Date().toISOString()
+            fecha_modificacion: new Date().toISOString()
           })
           .eq('id', editingPregunta.id)
           .select()
@@ -191,6 +190,29 @@ const GestionPreguntas = () => {
 
         console.log('🗑️ Respuesta eliminación opciones:', { error: deleteError })
         if (deleteError) throw deleteError
+
+        // Recrear opciones
+        console.log('🔧 Recreando opciones...')
+        for (let i = 0; i < formData.opciones.length; i++) {
+          const opcion = formData.opciones[i]
+          if (opcion.texto_opcion.trim()) {
+            const opcionData = {
+              pregunta_id: editingPregunta.id,
+              texto_opcion: opcion.texto_opcion,
+              es_correcta: opcion.es_correcta,
+              orden_mostrar: i + 1
+            }
+            
+            console.log(`📝 Insertando opción ${i + 1}:`, opcionData)
+            
+            const { error: opcionError } = await supabase
+              .from('opciones_respuesta')
+              .insert(opcionData)
+
+            console.log(`📊 Respuesta opción ${i + 1}:`, { error: opcionError })
+            if (opcionError) throw opcionError
+          }
+        }
       } else {
         console.log('➕ Creando nueva pregunta...')
         // Crear nueva pregunta
@@ -199,9 +221,7 @@ const GestionPreguntas = () => {
           imagen_url: formData.imagen_url || null,
           categoria: formData.categoria,
           nivel_dificultad: formData.nivel_dificultad,
-          orden_mostrar: formData.orden_mostrar,
-          usuario_creador: userInfo.identificacion,
-          usuario_modificador: userInfo.identificacion
+          orden_mostrar: formData.orden_mostrar
         }
         
         console.log('📤 Datos a insertar en pregunta:', preguntaData)
@@ -226,9 +246,7 @@ const GestionPreguntas = () => {
               pregunta_id: preguntaInsertada.id,
               texto_opcion: opcion.texto_opcion,
               es_correcta: opcion.es_correcta,
-              orden_mostrar: i + 1,
-              usuario_creador: userInfo.identificacion,
-              usuario_modificador: userInfo.identificacion
+              orden_mostrar: i + 1
             }
             
             console.log(`📝 Insertando opción ${i + 1}:`, opcionData)
