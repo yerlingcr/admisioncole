@@ -126,7 +126,7 @@ const Reportes = () => {
               : 0
 
             // Ahora sí: calcular porcentaje ponderado con el valor obtenido
-            porcentajePonderado = Math.round((intento.puntuacion_total * porcentajePrueba) / 100)
+            porcentajePonderado = ((intento.puntuacion_total * porcentajePrueba) / 100).toFixed(2)
 
             // Aplicar filtros
             if (filtros.categoria !== 'todas' && categoria !== filtros.categoria) {

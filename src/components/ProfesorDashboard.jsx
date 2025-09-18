@@ -241,7 +241,7 @@ const ProfesorDashboard = () => {
         }, { puntuacion_total: 0 })
 
         const puntosObtenidos = Math.round((mejorIntento.puntuacion_total / 100) * totalPreguntas)
-        const porcentajePonderado = Math.round((mejorIntento.puntuacion_total * porcentajePrueba) / 100)
+        const porcentajePonderado = ((mejorIntento.puntuacion_total * porcentajePrueba) / 100).toFixed(2)
 
         return {
           identificacion: estudiante.usuarios.identificacion,
