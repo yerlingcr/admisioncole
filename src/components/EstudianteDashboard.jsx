@@ -143,7 +143,7 @@ const EstudianteDashboard = () => {
       // Usar configuración por defecto si hay error
       setQuizConfig({
         tiempo_limite_minutos: 5,
-        numero_preguntas: 5,
+        total_preguntas: 5,
         puntaje_minimo_aprobacion: 70,
         intentos_permitidos: 2
       })
@@ -467,7 +467,7 @@ const EstudianteDashboard = () => {
                       <div>
                         <h4 className="font-semibold" style={{ color: colors.secondary }}>Total de Preguntas</h4>
                         <p className="text-sm" style={{ color: colors.white }}>
-                          {quizConfig ? `${quizConfig.numero_preguntas} preguntas distribuidas en diferentes áreas` : 'Cargando configuración...'}
+                          {quizConfig ? `${quizConfig.total_preguntas} preguntas distribuidas en diferentes áreas` : 'Cargando configuración...'}
                         </p>
                       </div>
                     </div>

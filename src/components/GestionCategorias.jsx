@@ -19,7 +19,8 @@ const GestionCategorias = () => {
     nombre: '',
     descripcion: '',
     color: '#f4b100',
-    activa: true
+    activa: true,
+    porcentaje_prueba: 0
   })
 
   useEffect(() => {
@@ -104,7 +105,8 @@ const GestionCategorias = () => {
       nombre: '',
       descripcion: '',
       color: '#f4b100',
-      activa: true
+      activa: true,
+      porcentaje_prueba: 0
     })
     setEditingCategoria(null)
     setShowForm(false)
@@ -123,6 +125,7 @@ const GestionCategorias = () => {
           descripcion: formData.descripcion,
           color: formData.color,
           activa: formData.activa,
+          porcentaje_prueba: formData.porcentaje_prueba,
           usuario_modificador: userInfo.identificacion
         }
 
@@ -148,6 +151,7 @@ const GestionCategorias = () => {
           descripcion: formData.descripcion,
           color: formData.color,
           activa: formData.activa,
+          porcentaje_prueba: formData.porcentaje_prueba,
           usuario_creador: userInfo.identificacion,
           usuario_modificador: userInfo.identificacion
         }
@@ -191,7 +195,8 @@ const GestionCategorias = () => {
       nombre: categoria.nombre,
       descripcion: categoria.descripcion || '',
       color: categoria.color,
-      activa: categoria.activa
+      activa: categoria.activa,
+      porcentaje_prueba: categoria.porcentaje_prueba || 0
     })
     setEditingCategoria(categoria)
     setShowForm(true)
@@ -367,7 +372,7 @@ const GestionCategorias = () => {
                     </div>
                   </div>
 
-                  {/* Estado y Orden */}
+                  {/* Estado y Porcentaje */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className="label">
@@ -388,7 +393,25 @@ const GestionCategorias = () => {
                       </select>
                     </div>
 
-                    
+                    <div>
+                      <label className="label">
+                        <span className="label-text" style={{ color: '#4d3930' }}>Porcentaje de la Prueba (%)</span>
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        value={formData.porcentaje_prueba}
+                        onChange={(e) => handleInputChange('porcentaje_prueba', parseInt(e.target.value) || 0)}
+                        className="input input-bordered w-full"
+                        style={{ 
+                          backgroundColor: '#ffffff', 
+                          borderColor: '#b47b21',
+                          color: '#4d3930'
+                        }}
+                        placeholder="0"
+                      />
+                    </div>
                   </div>
 
                   {/* Botones */}
@@ -427,7 +450,7 @@ const GestionCategorias = () => {
           <div className="card shadow-xl" style={{ backgroundColor: '#ffffff', border: '1px solid #b47b21' }}>
             <div className="card-body">
               <h2 className="card-title text-2xl mb-6" style={{ color: '#4d3930' }}>
-                🏷️ Categorías del Quiz ({categorias.length})
+                🏷️ Categorías ({categorias.length})
               </h2>
               <div className="text-center mb-4">
                 <span className="badge badge-lg" style={{ backgroundColor: '#f4b100', color: '#ffffff' }}>
@@ -468,10 +491,13 @@ const GestionCategorias = () => {
                              </p>
                            )}
                            
-                           {/* Contador de preguntas */}
+                           {/* Contador de preguntas y porcentaje */}
                            <div className="flex flex-wrap gap-2 mb-3">
                              <span className="badge" style={{ backgroundColor: '#4d3930', color: '#ffffff' }}>
                                📝 {preguntasPorCategoria[categoria.nombre] || 0} preguntas
+                             </span>
+                             <span className="badge" style={{ backgroundColor: '#f97316', color: '#ffffff' }}>
+                               📊 {categoria.porcentaje_prueba || 0}% de la prueba
                              </span>
                            </div>
                           

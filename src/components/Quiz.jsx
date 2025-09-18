@@ -158,7 +158,7 @@ const Quiz = () => {
       setTimeLeft(config.tiempo_limite_minutos * 60)
 
       // Obtener preguntas del quiz (con categorías específicas del usuario)
-      const quizQuestions = await quizService.getQuizQuestions(config.numero_preguntas, null, userInfo.identificacion)
+      const quizQuestions = await quizService.getQuizQuestions(config.total_preguntas, null, userInfo.identificacion)
       console.log('Preguntas obtenidas:', quizQuestions)
       console.log('Estructura de la primera pregunta:', quizQuestions[0])
       console.log('¿Tiene opciones?', quizQuestions[0]?.opciones)

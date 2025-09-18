@@ -54,7 +54,7 @@ export const configuracionService = {
       // Mapear campos del formulario a la base de datos
       const configData = {
         tiempo_limite_minutos: configuracion.tiempo_limite_minutos,
-        total_preguntas: configuracion.numero_preguntas,
+        total_preguntas: configuracion.total_preguntas,
         puntuacion_minima_aprobacion: configuracion.puntaje_minimo_aprobacion,
         intentos_permitidos: configuracion.intentos_permitidos,
         puntaje_por_pregunta: configuracion.puntaje_por_pregunta,
@@ -90,7 +90,7 @@ export const configuracionService = {
       // Mapear campos del formulario a la base de datos
       const configData = {
         tiempo_limite_minutos: configuracion.tiempo_limite_minutos,
-        total_preguntas: configuracion.numero_preguntas,
+        total_preguntas: configuracion.total_preguntas,
         puntuacion_minima_aprobacion: configuracion.puntaje_minimo_aprobacion,
         intentos_permitidos: configuracion.intentos_permitidos,
         puntaje_por_pregunta: configuracion.puntaje_por_pregunta,
@@ -175,7 +175,7 @@ export const configuracionService = {
   getConfiguracionPorDefecto() {
     return {
       tiempo_limite_minutos: 5,
-      numero_preguntas: 5,
+      total_preguntas: 5,
       puntaje_minimo_aprobacion: 70,
       intentos_permitidos: 2,
       puntaje_por_pregunta: 20,

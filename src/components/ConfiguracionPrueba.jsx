@@ -19,7 +19,7 @@ const ConfiguracionPrueba = () => {
   });
   const [formData, setFormData] = useState({
     tiempo_limite_minutos: 5,
-    numero_preguntas: 5,
+    total_preguntas: 5,
     puntaje_minimo_aprobacion: 70,
     intentos_permitidos: 1,
     puntaje_por_pregunta: 20,
@@ -39,6 +39,13 @@ const ConfiguracionPrueba = () => {
     loadConfiguraciones();
     loadInformacionInstitucional();
   }, []);
+
+  // Actualizar formData cuando cambie configuracionActiva
+  useEffect(() => {
+    if (configuracionActiva) {
+      setFormData(configuracionService.mapearConfiguracionParaFormulario(configuracionActiva));
+    }
+  }, [configuracionActiva]);
 
   const loadConfiguraciones = async () => {
     try {
@@ -194,6 +201,7 @@ const ConfiguracionPrueba = () => {
       
       if (configuracionActiva && configuracionActiva.id) {
         try {
+          
           await configuracionService.actualizarConfiguracion(
             configuracionActiva.id, 
             formData, 
@@ -205,6 +213,9 @@ const ConfiguracionPrueba = () => {
             text: 'Los cambios se han guardado correctamente',
             confirmButtonColor: colors.primary
           });
+          
+          // Recargar configuraciones para actualizar el estado
+          await loadConfiguraciones();
         } catch (updateError) {
           console.log('Error al actualizar, creando nueva configuración:', updateError);
           // Si falla la actualización, crear una nueva
@@ -487,8 +498,8 @@ const ConfiguracionPrueba = () => {
                   </label>
                   <input
                     type="number"
-                    name="numero_preguntas"
-                    value={formData.numero_preguntas}
+                    name="total_preguntas"
+                    value={formData.total_preguntas}
                     onChange={handleInputChange}
                     className="input input-bordered"
                     min="1"
