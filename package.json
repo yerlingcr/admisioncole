@@ -1,7 +1,7 @@
 {
   "name": "admision2025",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -10,7 +10,10 @@
     "lint:fix": "eslint . --ext js,jsx --fix",
     "preview": "vite preview",
     "format": "prettier --write \"src/**/*.{js,jsx,json,css,md}\"",
-    "clean": "rm -rf dist node_modules package-lock.json && npm install"
+    "clean": "rm -rf dist node_modules package-lock.json && npm install",
+    "version:patch": "node scripts/update-version.js patch",
+    "version:minor": "node scripts/update-version.js minor",
+    "version:major": "node scripts/update-version.js major"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.55.0",

@@ -194,6 +194,14 @@ npm run dev          # Servidor de desarrollo
 npm run build        # Construcción para producción
 npm run preview      # Vista previa de la construcción
 npm run lint         # Linter de código
+npm run lint:fix     # Corregir errores de linting automáticamente
+npm run format       # Formatear código con Prettier
+npm run clean        # Limpiar dependencias y reinstalar
+
+# Sistema de Versionado
+npm run version:patch "Descripción del bug corregido"
+npm run version:minor "Descripción de la nueva funcionalidad"
+npm run version:major "Descripción del cambio mayor"
 ```
 
 ## 🐛 Solución de Problemas
@@ -207,6 +215,33 @@ npm run lint         # Linter de código
 ### Logs de Debug
 El sistema incluye logs detallados en la consola del navegador para facilitar el debugging.
 
+## 📋 Sistema de Versionado
+
+El proyecto utiliza **Semantic Versioning** (SemVer) para el control de versiones:
+
+- **MAJOR (X)**: Cambios incompatibles con versiones anteriores
+- **MINOR (Y)**: Nuevas funcionalidades compatibles hacia atrás  
+- **PATCH (Z)**: Correcciones de bugs
+
+### Comandos de Versionado
+
+```bash
+# Corrección de bugs (1.0.0 → 1.0.1)
+npm run version:patch "Descripción del bug corregido"
+
+# Nueva funcionalidad (1.0.0 → 1.1.0)
+npm run version:minor "Descripción de la nueva funcionalidad"
+
+# Cambio mayor (1.0.0 → 2.0.0)
+npm run version:major "Descripción del cambio mayor"
+```
+
+### Documentación
+
+- **`CHANGELOG.md`**: Historial completo de cambios
+- **`VERSIONING.md`**: Documentación detallada del sistema
+- **`scripts/update-version.js`**: Script automatizado de versionado
+
 ## 📄 Licencia
 
 Este proyecto es privado y está destinado para uso interno de la institución educativa.
@@ -218,5 +253,5 @@ Este proyecto es privado y está destinado para uso interno de la institución e
 
 ---
 
-**Última actualización**: Diciembre 2024
+**Última actualización**: Septiembre 2025
 **Versión**: 1.0.0
