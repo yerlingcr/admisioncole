@@ -16,6 +16,8 @@ const Reportes = () => {
   const [estudianteSeleccionado, setEstudianteSeleccionado] = useState(null)
   const [detallesPrueba, setDetallesPrueba] = useState(null)
   const [loadingDetalles, setLoadingDetalles] = useState(false)
+  const [paginaActual, setPaginaActual] = useState(1)
+  const [registrosPorPagina] = useState(10)
 
   const colors = {
     primary: '#4d3930',
@@ -187,14 +189,43 @@ const Reportes = () => {
   }
 
   const aplicarFiltros = () => {
+    setPaginaActual(1) // Resetear a la primera página
     loadDatosReporte()
   }
 
   const limpiarFiltros = () => {
+    setPaginaActual(1) // Resetear a la primera página
     setFiltros({
       categoria: 'todas',
       estado: 'todos'
     })
+  }
+
+  // Funciones de paginación
+  const getDatosPaginados = () => {
+    const inicio = (paginaActual - 1) * registrosPorPagina
+    const fin = inicio + registrosPorPagina
+    return datosReporte.slice(inicio, fin)
+  }
+
+  const getTotalPaginas = () => {
+    return Math.ceil(datosReporte.length / registrosPorPagina)
+  }
+
+  const cambiarPagina = (nuevaPagina) => {
+    setPaginaActual(nuevaPagina)
+  }
+
+  const irAPaginaAnterior = () => {
+    if (paginaActual > 1) {
+      setPaginaActual(paginaActual - 1)
+    }
+  }
+
+  const irAPaginaSiguiente = () => {
+    if (paginaActual < getTotalPaginas()) {
+      setPaginaActual(paginaActual + 1)
+    }
   }
 
   const cargarDetallesPrueba = async (estudiante) => {
@@ -886,7 +917,7 @@ const Reportes = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {datosReporte.slice(0, 10).map((item, index) => (
+                  {getDatosPaginados().map((item, index) => (
                     <tr key={index}>
                       <td className="font-mono text-sm">{item.identificacion}</td>
                       <td>{item.nombre}</td>
@@ -944,11 +975,56 @@ const Reportes = () => {
                 </tbody>
               </table>
               
-              {datosReporte.length > 10 && (
-                <div className="text-center mt-4">
-                  <p className="text-sm text-gray-500">
-                    Mostrando los primeros 10 de {datosReporte.length} registros
-                  </p>
+              {/* Controles de Paginación */}
+              {getTotalPaginas() > 1 && (
+                <div className="flex flex-col items-center mt-6 space-y-4">
+                  {/* Información de registros */}
+                  <div className="text-sm text-gray-600">
+                    Mostrando {((paginaActual - 1) * registrosPorPagina) + 1} - {Math.min(paginaActual * registrosPorPagina, datosReporte.length)} de {datosReporte.length} registros
+                  </div>
+                  
+                  {/* Controles de navegación */}
+                  <div className="flex items-center space-x-2">
+                    {/* Botón Anterior */}
+                    <button
+                      onClick={irAPaginaAnterior}
+                      disabled={paginaActual === 1}
+                      className={`btn btn-sm ${paginaActual === 1 ? 'btn-disabled' : 'btn-outline'}`}
+                    >
+                      ← Anterior
+                    </button>
+                    
+                    {/* Números de página */}
+                    <div className="flex space-x-1">
+                      {Array.from({ length: getTotalPaginas() }, (_, i) => i + 1).map(numero => (
+                        <button
+                          key={numero}
+                          onClick={() => cambiarPagina(numero)}
+                          className={`btn btn-sm ${
+                            numero === paginaActual 
+                              ? 'btn-primary' 
+                              : 'btn-outline'
+                          }`}
+                        >
+                          {numero}
+                        </button>
+                      ))}
+                    </div>
+                    
+                    {/* Botón Siguiente */}
+                    <button
+                      onClick={irAPaginaSiguiente}
+                      disabled={paginaActual === getTotalPaginas()}
+                      className={`btn btn-sm ${paginaActual === getTotalPaginas() ? 'btn-disabled' : 'btn-outline'}`}
+                    >
+                      Siguiente →
+                    </button>
+                  </div>
+                  
+                  {/* Información de página actual */}
+                  <div className="text-xs text-gray-500">
+                    Página {paginaActual} de {getTotalPaginas()}
+                  </div>
                 </div>
               )}
             </div>

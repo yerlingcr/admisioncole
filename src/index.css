@@ -2,6 +2,40 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Estilos para impresión del gráfico Top 10 */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  
+  .chart-print-container, 
+  .chart-print-container * {
+    visibility: visible;
+  }
+  
+  .chart-print-container {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100% !important;
+    height: auto !important;
+    page-break-inside: avoid;
+  }
+  
+  .chart-print-container .card {
+    box-shadow: none !important;
+    border: 1px solid #000 !important;
+  }
+  
+  .chart-print-container .btn {
+    display: none !important;
+  }
+  
+  .chart-print-container .h-96 {
+    height: 400px !important;
+  }
+}
+
 /* Estilos personalizados para SweetAlert2 */
 .swal2-popup-custom {
   border-radius: 12px !important;

@@ -65,7 +65,6 @@ const Quiz = () => {
           const isSameStudent = progressData.studentId === userInfo.identificacion
           
           if (isSameStudent && isRecent && progressData.questions?.length > 0) {
-            console.log('🔄 Cargando progreso guardado en lugar de datos nuevos...')
             setAnswers(progressData.answers || {})
             setTimeLeft(progressData.timeLeft || 0)
             setCurrentQuestion(progressData.currentQuestion || 0)
@@ -142,7 +141,6 @@ const Quiz = () => {
       }
 
       setLoading(true)
-      console.log('Cargando datos del quiz para:', userInfo.identificacion)
       
       // Verificar si el estudiante puede realizar el quiz
       const canTakeQuiz = await quizService.canStudentTakeQuiz(userInfo.identificacion)
@@ -159,11 +157,6 @@ const Quiz = () => {
 
       // Obtener preguntas del quiz (con categorías específicas del usuario)
       const quizQuestions = await quizService.getQuizQuestions(config.total_preguntas, null, userInfo.identificacion)
-      console.log('Preguntas obtenidas:', quizQuestions)
-      console.log('Estructura de la primera pregunta:', quizQuestions[0])
-      console.log('¿Tiene opciones?', quizQuestions[0]?.opciones)
-      console.log('Número de opciones:', quizQuestions[0]?.opciones?.length)
-      console.log('Primera opción:', quizQuestions[0]?.opciones?.[0])
       
       // Validar que hay preguntas disponibles
       if (!quizQuestions || quizQuestions.length === 0) {
@@ -184,7 +177,6 @@ const Quiz = () => {
 
       // Verificar si hay un intento activo para reanudar
       if (canTakeQuiz.hasActiveAttempt && canTakeQuiz.attemptId) {
-        console.log('Reanudando intento existente:', canTakeQuiz.attemptId)
         const activeAttempt = await quizService.getActiveAttemptWithAnswers(userInfo.identificacion)
         if (activeAttempt) {
           setCurrentAttempt(activeAttempt)
@@ -201,13 +193,11 @@ const Quiz = () => {
           // Para debugging: siempre empezar con tiempo completo
           setTimeLeft(config.tiempo_limite_minutos * 60)
           
-          console.log('Intento reanudado con respuestas:', existingAnswers)
           return
         }
       }
 
       // Crear nuevo intento de quiz
-      console.log('Creando nuevo intento de quiz')
       const attempt = await quizService.createQuizAttempt(userInfo.identificacion)
       setCurrentAttempt(attempt)
 

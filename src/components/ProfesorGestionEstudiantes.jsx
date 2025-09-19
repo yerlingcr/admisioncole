@@ -488,57 +488,7 @@ const ProfesorGestionEstudiantes = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-4">
-            <div className="flex items-center space-x-4">
-              <h1 className="text-2xl font-bold text-gray-800">Mis Estudiantes</h1>
-              <span className="badge bg-blue-600 text-white border-0">
-                👤 {userInfo.nombre} {userInfo.apellido}
-              </span>
-              <span className="badge bg-amber-600 text-white border-0">
-                📚 {categoriaAsignada}
-              </span>
-            </div>
-            <div className="flex items-center space-x-4">
-              <ThemeToggle />
-              <button
-                onClick={handleLogout}
-                className="btn btn-outline btn-sm text-gray-600 hover:bg-gray-100"
-              >
-                Cerrar Sesión
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
 
-      {/* Navegación */}
-      <div className="bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <nav className="flex space-x-8">
-            <button
-              onClick={() => navigate('/profesor/dashboard')}
-              className="py-4 px-1 border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-            >
-              Dashboard
-            </button>
-            <button
-              onClick={() => navigate('/profesor/gestion-preguntas')}
-              className="py-4 px-1 border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-            >
-              Mis Preguntas
-            </button>
-            <button
-              onClick={() => navigate('/profesor/gestion-estudiantes')}
-              className="py-4 px-1 border-b-2 border-amber-500 text-amber-600 font-medium"
-            >
-              Mis Estudiantes
-            </button>
-          </nav>
-        </div>
-      </div>
 
       {/* Contenido Principal */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">

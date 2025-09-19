@@ -50,7 +50,6 @@ const GestionPreguntas = () => {
   const loadCategorias = async () => {
     try {
       const categorias = await usuarioCategoriasService.getCategoriasDisponibles()
-      console.log('Categorías cargadas:', categorias)
       setCategoriasDisponibles(categorias)
     } catch (error) {
       console.error('Error cargando categorías:', error)
@@ -192,7 +191,6 @@ const GestionPreguntas = () => {
           orden_mostrar: formData.orden_mostrar
         }
         
-        console.log('📤 Datos de actualización:', updateData)
         
         // Actualizar pregunta existente
         const { data: preguntaData, error: preguntaError } = await supabase
@@ -231,7 +229,6 @@ const GestionPreguntas = () => {
           }
         }
       } else {
-        console.log('➕ Creando nueva pregunta...')
         // Crear nueva pregunta
         const preguntaData = {
           pregunta: formData.pregunta,
@@ -241,7 +238,6 @@ const GestionPreguntas = () => {
           orden_mostrar: formData.orden_mostrar
         }
         
-        console.log('📤 Datos a insertar en pregunta:', preguntaData)
         
         const { data: preguntaInsertada, error: preguntaError } = await supabase
           .from('preguntas_quiz')
@@ -272,7 +268,6 @@ const GestionPreguntas = () => {
         }
       }
 
-      console.log('🎉 ¡Pregunta guardada exitosamente!')
       
       // Actualizar la lista primero
       await loadPreguntas()

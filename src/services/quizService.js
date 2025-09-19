@@ -23,7 +23,6 @@ class QuizService {
       let categoriasUsuario = []
       if (usuarioId) {
         categoriasUsuario = await usuarioCategoriasService.getCategoriasByUsuario(usuarioId)
-        console.log('Categorías asignadas al usuario:', categoriasUsuario)
       }
 
       // Si el usuario tiene categorías asignadas, usar solo esas
@@ -73,7 +72,6 @@ class QuizService {
 
       if (error) throw error
 
-      console.log('Preguntas encontradas para categorías del usuario:', data.length)
 
       // Procesar las preguntas
       const processedQuestions = data
@@ -92,9 +90,6 @@ class QuizService {
       // Tomar solo el número de preguntas solicitado
       const preguntasSeleccionadas = preguntasAleatorias.slice(0, totalQuestions)
 
-      console.log('Preguntas procesadas para el usuario:', preguntasSeleccionadas.length)
-      console.log('🔀 Preguntas aleatorizadas:', preguntasSeleccionadas.map(p => p.id))
-      console.log('🔀 Opciones aleatorizadas en primera pregunta:', preguntasSeleccionadas[0]?.opciones?.map(o => ({ id: o.id, texto: o.texto_opcion.substring(0, 20) + '...' })))
       return preguntasSeleccionadas
     } catch (error) {
       console.error('Error obteniendo preguntas por categorías:', error)
@@ -131,12 +126,10 @@ class QuizService {
 
       if (error) throw error
 
-      console.log('Datos brutos de preguntas:', data)
 
       // Procesar y aleatorizar las preguntas
       const processedQuestions = data
         .map(q => {
-          console.log('Procesando pregunta:', q)
           return {
             id: q.id,
             pregunta: q.pregunta,
@@ -156,7 +149,6 @@ class QuizService {
         .sort(() => Math.random() - 0.5) // Aleatorizar orden
         .slice(0, totalQuestions)
 
-      console.log('Preguntas procesadas:', processedQuestions)
       return processedQuestions
     } catch (error) {
       console.error('Error en fallback de preguntas:', error)
@@ -332,12 +324,10 @@ class QuizService {
   // Verificar si el estudiante puede realizar el quiz
   async canStudentTakeQuiz(estudianteId) {
     try {
-      console.log('Iniciando verificación para estudiante:', estudianteId)
       
       // Verificar configuración del sistema
       try {
         const config = await configuracionService.getConfiguracionActiva()
-        console.log('Configuración encontrada:', config)
         
         if (!config) {
           return {
@@ -411,7 +401,6 @@ class QuizService {
   // Función para resetear oportunidades de un estudiante
   async resetearOportunidadesEstudiante(estudianteId) {
     try {
-      console.log('🔄 Reseteando oportunidades para estudiante:', estudianteId)
       
       // 1. Primero obtener todos los intentos del estudiante para eliminar sus respuestas
       const { data: intentos, error: errorIntentos } = await supabase
@@ -424,8 +413,6 @@ class QuizService {
         throw errorIntentos
       }
 
-      console.log('📊 Intentos encontrados para eliminar:', intentos)
-      console.log('📊 Cantidad de intentos a eliminar:', intentos?.length || 0)
 
       // 2. Eliminar todas las respuestas relacionadas con estos intentos
       if (intentos && intentos.length > 0) {
@@ -462,10 +449,8 @@ class QuizService {
       if (errorVerificacion) {
         console.error('Error verificando eliminación:', errorVerificacion)
       } else {
-        console.log('📊 Intentos restantes después del reset:', intentosRestantes?.length || 0)
       }
 
-      console.log('✅ Oportunidades reseteadas correctamente para:', estudianteId)
       return { success: true }
     } catch (error) {
       console.error('❌ Error reseteando oportunidades:', error)

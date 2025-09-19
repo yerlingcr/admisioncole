@@ -352,7 +352,6 @@ const Estadisticas = () => {
   }
 
   const formatPercentage = (value) => {
-    console.log('🔢 Formateando porcentaje:', value, 'Tipo:', typeof value)
     if (value === null || value === undefined || isNaN(value)) {
       return '0.0%'
     }

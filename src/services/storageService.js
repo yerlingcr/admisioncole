@@ -22,13 +22,6 @@ class StorageService {
       const extension = processedFile.name.split('.').pop()
       const finalFileName = fileName || `admin/${timestamp}_${randomId}.${extension}`
 
-      console.log('📤 Subiendo imagen:', {
-        fileName: finalFileName,
-        sizeOriginal: (file.size / 1024 / 1024).toFixed(2) + ' MB',
-        sizeProcessed: (processedFile.size / 1024 / 1024).toFixed(2) + ' MB',
-        type: processedFile.type
-      })
-
       // Subir archivo al bucket
       const { data, error } = await supabase.storage
         .from(this.bucketName)
@@ -42,14 +35,12 @@ class StorageService {
         throw error
       }
 
-      console.log('✅ Imagen subida exitosamente:', data)
 
       // Obtener URL pública de la imagen
       const { data: urlData } = supabase.storage
         .from(this.bucketName)
         .getPublicUrl(finalFileName)
 
-      console.log('🔗 URL pública generada:', urlData.publicUrl)
 
       return {
         success: true,
@@ -68,7 +59,6 @@ class StorageService {
   // Eliminar imagen del storage
   async deleteImage(fileName) {
     try {
-      console.log('🗑️ Eliminando imagen:', fileName)
 
       const { data, error } = await supabase.storage
         .from(this.bucketName)
@@ -79,7 +69,6 @@ class StorageService {
         throw error
       }
 
-      console.log('✅ Imagen eliminada exitosamente:', data)
       return { success: true, data }
     } catch (error) {
       console.error('❌ Error en deleteImage:', error)
@@ -90,7 +79,6 @@ class StorageService {
   // Obtener lista de imágenes del bucket
   async listImages(folder = 'admin') {
     try {
-      console.log('📋 Listando imágenes de la carpeta:', folder)
 
       const { data, error } = await supabase.storage
         .from(this.bucketName)
@@ -104,7 +92,6 @@ class StorageService {
         throw error
       }
 
-      console.log('✅ Imágenes listadas:', data)
       return data
     } catch (error) {
       console.error('❌ Error en listImages:', error)
@@ -130,12 +117,9 @@ class StorageService {
   // Comprimir imagen si es necesario
   async compressImage(file) {
     try {
-      console.log('🔧 Comprimiendo imagen...')
-      console.log('📊 Tamaño original:', (file.size / 1024 / 1024).toFixed(2), 'MB')
 
       // Si la imagen es menor a 5MB, no comprimir
       if (file.size <= this.maxFileSize) {
-        console.log('✅ Imagen no necesita compresión')
         return file
       }
 
@@ -148,13 +132,10 @@ class StorageService {
         quality: this.quality
       }
 
-      console.log('⚙️ Opciones de compresión:', options)
 
       // Comprimir imagen
       const compressedFile = await imageCompression(file, options)
       
-      console.log('📊 Tamaño comprimido:', (compressedFile.size / 1024 / 1024).toFixed(2), 'MB')
-      console.log('📈 Ratio de compresión:', ((1 - compressedFile.size / file.size) * 100).toFixed(1) + '%')
 
       return compressedFile
     } catch (error) {

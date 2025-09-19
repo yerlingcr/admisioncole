@@ -10,6 +10,11 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 ### Corregido
 - Limpieza completa de logs de debug del sistema y mejoras en el Ver Prueba de las Notas de Estudiantes de Dashboard de Profesor, donde se incluye la opción correcta y la que marcó el estudiante
 
+## [1.0.2] - 2025-09-19
+
+### Corregido
+- Actualización patch
+
 ## [1.0.0] - 2025-09-18
 
 ### Agregado

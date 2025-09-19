@@ -7,6 +7,13 @@ import ThemeToggle from './ThemeToggle'
 import usuarioCategoriasService from '../services/usuarioCategoriasService'
 import Swal from 'sweetalert2'
 import jsPDF from 'jspdf'
+import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend } from 'chart.js'
+import { Bar } from 'react-chartjs-2'
+import ProfesorGestionPreguntas from './ProfesorGestionPreguntas'
+import ProfesorGestionEstudiantes from './ProfesorGestionEstudiantes'
+
+// Registrar componentes de Chart.js
+ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend)
 
 const ProfesorDashboard = () => {
   const { user, logout } = useAuth()
@@ -20,14 +27,16 @@ const ProfesorDashboard = () => {
     totalEstudiantes: 0,
     estudiantesActivos: 0
   })
-  const [preguntasCategoria, setPreguntasCategoria] = useState([])
-  const [estudiantesCategoria, setEstudiantesCategoria] = useState([])
   const [notasEstudiantes, setNotasEstudiantes] = useState([])
   const [loadingNotas, setLoadingNotas] = useState(false)
   const [busquedaNotas, setBusquedaNotas] = useState('')
   const [estudianteSeleccionado, setEstudianteSeleccionado] = useState(null)
   const [detallesPrueba, setDetallesPrueba] = useState(null)
   const [loadingDetalles, setLoadingDetalles] = useState(false)
+  const [topEstudiantesData, setTopEstudiantesData] = useState(null)
+  const [mostrarNotas, setMostrarNotas] = useState(false)
+  const [mostrarGraficos, setMostrarGraficos] = useState(false)
+  const [seccionActiva, setSeccionActiva] = useState('dashboard')
 
   useEffect(() => {
     loadUserInfo()
@@ -37,6 +46,7 @@ const ProfesorDashboard = () => {
     if (categoriaAsignada && userInfo) {
       loadEstadisticas(categoriaAsignada)
       loadNotasEstudiantes()
+      loadTopEstudiantes()
     }
   }, [categoriaAsignada, userInfo])
 
@@ -135,8 +145,6 @@ const ProfesorDashboard = () => {
         estudiantesActivos: estudiantesActivosCount
       })
 
-      setPreguntasCategoria(preguntasData || [])
-      setEstudiantesCategoria(estudiantesCategoria)
     } catch (error) {
       console.error('Error cargando estadísticas:', error)
     }
@@ -516,6 +524,124 @@ const ProfesorDashboard = () => {
     }
   }
 
+  const loadTopEstudiantes = async () => {
+    if (!categoriaAsignada) return
+    
+    try {
+      // Obtener estudiantes de la categoría del profesor
+      const { data: estudiantesCategoria, error: errorEstudiantes } = await supabase
+        .from('usuario_categorias')
+        .select(`
+          usuario_id,
+          usuarios!inner(
+            identificacion,
+            nombre,
+            primer_apellido,
+            segundo_apellido,
+            estado
+          )
+        `)
+        .eq('categoria', categoriaAsignada)
+        .eq('usuarios.rol', 'Estudiante')
+
+      if (errorEstudiantes) {
+        console.error('❌ Error cargando estudiantes para top:', errorEstudiantes)
+        return
+      }
+
+      if (!estudiantesCategoria || estudiantesCategoria.length === 0) {
+        setTopEstudiantesData(null)
+        return
+      }
+
+      // Obtener intentos de los estudiantes
+      const estudianteIds = estudiantesCategoria.map(item => item.usuario_id)
+      const { data: intentos, error: errorIntentos } = await supabase
+        .from('intentos_quiz')
+        .select('estudiante_id, puntuacion_total, fecha_fin')
+        .in('estudiante_id', estudianteIds)
+        .not('fecha_fin', 'is', null)
+        .not('puntuacion_total', 'is', null)
+
+      if (errorIntentos) {
+        console.error('❌ Error cargando intentos para top:', errorIntentos)
+        return
+      }
+
+      // Procesar datos para obtener la mejor nota de cada estudiante
+      const estudiantesConMejoresNotas = estudiantesCategoria.map(estudiante => {
+        const intentosEstudiante = intentos?.filter(i => i.estudiante_id === estudiante.usuario_id) || []
+        
+        // Obtener la mejor puntuación del estudiante
+        const mejorIntento = intentosEstudiante.reduce((mejor, actual) => {
+          return actual.puntuacion_total > mejor.puntuacion_total ? actual : mejor
+        }, { puntuacion_total: 0 })
+
+        return {
+          identificacion: estudiante.usuarios.identificacion,
+          nombre: estudiante.usuarios.nombre,
+          apellidos: `${estudiante.usuarios.primer_apellido} ${estudiante.usuarios.segundo_apellido || ''}`.trim(),
+          notaObtenida: mejorIntento.puntuacion_total || 0,
+          fechaIntento: mejorIntento.fecha_fin || null
+        }
+      })
+
+      // Filtrar estudiantes con notas > 0 y ordenar por nota descendente
+      const estudiantesConNotas = estudiantesConMejoresNotas
+        .filter(estudiante => estudiante.notaObtenida > 0)
+        .sort((a, b) => b.notaObtenida - a.notaObtenida)
+        .slice(0, 10) // Top 10
+
+      // Preparar datos para el gráfico
+      if (estudiantesConNotas.length > 0) {
+        const chartData = {
+          labels: estudiantesConNotas.map(estudiante => 
+            `${estudiante.nombre} ${estudiante.apellidos}`
+          ),
+          datasets: [
+            {
+              label: 'Nota Obtenida',
+              data: estudiantesConNotas.map(estudiante => estudiante.notaObtenida),
+              backgroundColor: [
+                '#4d3930', // Color primario
+                '#b47b21', // Color secundario
+                '#f4b100', // Color accent
+                '#10b981', // Verde
+                '#3b82f6', // Azul
+                '#8b5cf6', // Púrpura
+                '#f59e0b', // Amarillo
+                '#ef4444', // Rojo
+                '#06b6d4', // Cian
+                '#84cc16'  // Verde lima
+              ],
+              borderColor: [
+                '#2d2119',
+                '#8b5c0f',
+                '#c49100',
+                '#059669',
+                '#2563eb',
+                '#7c3aed',
+                '#d97706',
+                '#dc2626',
+                '#0891b2',
+                '#65a30d'
+              ],
+              borderWidth: 2
+            }
+          ]
+        }
+
+        setTopEstudiantesData(chartData)
+      } else {
+        setTopEstudiantesData(null)
+      }
+
+    } catch (error) {
+      console.error('❌ Error cargando top estudiantes:', error)
+      setTopEstudiantesData(null)
+    }
+  }
+
   const loadNotasEstudiantes = async () => {
     if (!categoriaAsignada) return
     
@@ -638,6 +764,53 @@ const ProfesorDashboard = () => {
     )
   }
 
+  // Funciones de navegación
+  const scrollToTop = () => {
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  const scrollToNotas = () => {
+    const notasSection = document.getElementById('notas-estudiantes')
+    if (notasSection) {
+      notasSection.scrollIntoView({ behavior: 'smooth' })
+    }
+  }
+
+  const irAInicio = () => {
+    setMostrarNotas(false)
+    setMostrarGraficos(false)
+    setSeccionActiva('dashboard')
+    scrollToTop()
+  }
+
+  const irAGraficos = () => {
+    setMostrarNotas(false)
+    setMostrarGraficos(true)
+    setSeccionActiva('graficos')
+    scrollToTop()
+  }
+
+  const irANotas = () => {
+    setMostrarNotas(true)
+    setMostrarGraficos(false)
+    setSeccionActiva('notas')
+    setTimeout(scrollToNotas, 100)
+  }
+
+  const irAPreguntas = () => {
+    setMostrarNotas(false)
+    setMostrarGraficos(false)
+    setSeccionActiva('preguntas')
+    scrollToTop()
+  }
+
+  const irAEstudiantes = () => {
+    setMostrarNotas(false)
+    setMostrarGraficos(false)
+    setSeccionActiva('estudiantes')
+    scrollToTop()
+  }
+
   // Removemos la verificación de categoría - el profesor puede acceder sin categoría asignada
 
   return (
@@ -680,31 +853,45 @@ const ProfesorDashboard = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <nav className="flex space-x-8">
             <button
-              onClick={() => navigate('/profesor/dashboard')}
-              className="py-4 px-1 border-b-2 border-amber-500 text-amber-600 font-medium"
+              onClick={irAInicio}
+              className={`py-4 px-1 border-b-2 ${seccionActiva === 'dashboard' ? 'border-amber-500 text-amber-600 font-medium' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
             >
               Dashboard
             </button>
             <button
-              onClick={() => navigate('/profesor/gestion-preguntas')}
-              className="py-4 px-1 border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+              onClick={irAPreguntas}
+              className={`py-4 px-1 border-b-2 ${seccionActiva === 'preguntas' ? 'border-orange-500 text-orange-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
             >
               Mis Preguntas
             </button>
             <button
-              onClick={() => navigate('/profesor/gestion-estudiantes')}
-              className="py-4 px-1 border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+              onClick={irAEstudiantes}
+              className={`py-4 px-1 border-b-2 ${seccionActiva === 'estudiantes' ? 'border-orange-500 text-orange-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
             >
               Mis Estudiantes
+            </button>
+            <button
+              onClick={irAGraficos}
+              className={`py-4 px-1 border-b-2 ${seccionActiva === 'graficos' ? 'border-orange-500 text-orange-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
+            >
+              Gráficos
+            </button>
+            <button
+              onClick={irANotas}
+              className={`py-4 px-1 border-b-2 ${seccionActiva === 'notas' ? 'border-orange-500 text-orange-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
+            >
+              Notas
             </button>
           </nav>
         </div>
       </div>
 
+
       {/* Contenido Principal */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Estadísticas */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        {/* Estadísticas - Solo en Dashboard */}
+        {seccionActiva === 'dashboard' && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <div className="card bg-white border border-gray-300 shadow-lg">
             <div className="card-body">
               <div className="flex items-center">
@@ -777,9 +964,10 @@ const ProfesorDashboard = () => {
             </div>
           </div>
         </div>
+        )}
 
-        {/* Información de la Categoría - Solo mostrar si hay categoría asignada */}
-        {categoriaAsignada && (
+        {/* Información de la Categoría - Solo en Dashboard */}
+        {categoriaAsignada && seccionActiva === 'dashboard' && (
           <div className="card bg-white border border-gray-300 shadow-lg">
             <div className="card-body">
               <h2 className="card-title text-xl text-gray-800 mb-4">
@@ -826,8 +1014,9 @@ const ProfesorDashboard = () => {
           </div>
         )}
 
-        {/* Acciones Rápidas */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
+        {/* Acciones Rápidas - Solo en Dashboard */}
+        {seccionActiva === 'dashboard' && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
           <div className="card bg-white border border-gray-300 shadow-lg">
             <div className="card-body">
               <h3 className="card-title text-lg text-gray-800 mb-4">📝 Gestión de Preguntas</h3>
@@ -866,10 +1055,11 @@ const ProfesorDashboard = () => {
             </div>
           </div>
         </div>
+        )}
 
         {/* Sección de Notas de Estudiantes */}
-        {categoriaAsignada && (
-          <div className="mt-8">
+        {categoriaAsignada && (seccionActiva === 'notas' || seccionActiva === 'dashboard') && (
+          <div id="notas-estudiantes" className="mt-8">
             <div className="card bg-white border border-gray-300 shadow-lg">
               <div className="card-body">
                 <div className="flex justify-between items-center mb-6">
@@ -1049,142 +1239,7 @@ const ProfesorDashboard = () => {
           </div>
         )}
 
-        {/* Lista de Preguntas de la Categoría */}
-        {categoriaAsignada && (
-          <div className="mt-8">
-            <div className="card bg-white border border-gray-300 shadow-lg">
-              <div className="card-body">
-                <div className="flex justify-between items-center mb-6">
-                  <h2 className="card-title text-xl text-gray-800">
-                    📚 Preguntas de la Categoría "{typeof categoriaAsignada === 'string' ? categoriaAsignada : categoriaAsignada.nombre}"
-                  </h2>
-                  <span className="badge badge-primary">
-                    {preguntasCategoria.length} preguntas
-                  </span>
-                </div>
-                
-                {preguntasCategoria.length === 0 ? (
-                  <div className="text-center py-8">
-                    <p className="text-gray-500 mb-4">No hay preguntas en esta categoría aún.</p>
-                    <button
-                      onClick={() => navigate('/profesor/gestion-preguntas')}
-                      className="btn btn-primary"
-                    >
-                      Crear Primera Pregunta
-                    </button>
-                  </div>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="table table-zebra w-full">
-                      <thead>
-                        <tr>
-                          <th>Pregunta</th>
-                          <th>Creador</th>
-                          <th>Fecha</th>
-                          <th>Estado</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {preguntasCategoria.map((pregunta) => (
-                          <tr key={pregunta.id}>
-                            <td>
-                              <div className="max-w-xs">
-                                <p className="font-medium truncate">{pregunta.pregunta}</p>
-                                {pregunta.imagen_url && (
-                                  <span className="text-xs text-gray-500">📷 Con imagen</span>
-                                )}
-                              </div>
-                            </td>
-                            <td>
-                              <span className={`badge ${pregunta.usuario_creador === userInfo?.identificacion ? 'badge-success' : 'badge-neutral'}`}>
-                                {pregunta.usuario_creador === userInfo?.identificacion ? 'Tú' : pregunta.usuario_creador || 'Sistema'}
-                              </span>
-                            </td>
-                            <td>
-                              <span className="text-sm text-gray-500">
-                                {new Date(pregunta.fecha_creacion).toLocaleDateString()}
-                              </span>
-                            </td>
-                            <td>
-                              <span className={`badge ${pregunta.activa ? 'badge-success' : 'badge-error'}`}>
-                                {pregunta.activa ? 'Activa' : 'Inactiva'}
-                              </span>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
 
-        {/* Lista de Estudiantes de la Categoría */}
-        {categoriaAsignada && (
-          <div className="mt-8">
-            <div className="card bg-white border border-gray-300 shadow-lg">
-              <div className="card-body">
-                <div className="flex justify-between items-center mb-6">
-                  <h2 className="card-title text-xl text-gray-800">
-                    👥 Estudiantes de la Categoría "{typeof categoriaAsignada === 'string' ? categoriaAsignada : categoriaAsignada.nombre}"
-                  </h2>
-                  <span className="badge badge-primary">
-                    {estudiantesCategoria.length} estudiantes
-                  </span>
-                </div>
-                
-                {estudiantesCategoria.length === 0 ? (
-                  <div className="text-center py-8">
-                    <p className="text-gray-500 mb-4">No hay estudiantes asignados a esta categoría aún.</p>
-                    <button
-                      onClick={() => navigate('/profesor/gestion-estudiantes')}
-                      className="btn btn-primary"
-                    >
-                      Agregar Primer Estudiante
-                    </button>
-                  </div>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="table table-zebra w-full">
-                      <thead>
-                        <tr>
-                          <th>Nombre</th>
-                          <th>Identificación</th>
-                          <th>Email</th>
-                          <th>Estado</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {estudiantesCategoria.map((estudiante) => (
-                          <tr key={estudiante.identificacion}>
-                            <td>
-                              <div className="font-medium">
-                                {estudiante.nombre} {estudiante.primer_apellido} {estudiante.segundo_apellido || ''}
-                              </div>
-                            </td>
-                            <td>
-                              <span className="text-sm font-mono">{estudiante.identificacion}</span>
-                            </td>
-                            <td>
-                              <span className="text-sm text-gray-500">{estudiante.email || 'Sin email'}</span>
-                            </td>
-                            <td>
-                              <span className={`badge ${estudiante.estado === 'Activo' ? 'badge-success' : 'badge-error'}`}>
-                                {estudiante.estado}
-                              </span>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* Modal para mostrar detalles de la prueba */}
         {detallesPrueba && estudianteSeleccionado && (
@@ -1356,7 +1411,324 @@ const ProfesorDashboard = () => {
             </div>
           </div>
         )}
+
+        {/* Sección de Mis Preguntas - Solo en Dashboard */}
+        {seccionActiva === 'dashboard' && (
+          <div className="mt-8">
+            <div className="card bg-white border border-gray-300 shadow-lg">
+              <div className="card-body">
+                <h2 className="card-title text-xl text-gray-800 mb-6">
+                  📝 Mis Preguntas
+                </h2>
+                <ProfesorGestionPreguntas />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Sección de Mis Estudiantes - Solo en Dashboard */}
+        {seccionActiva === 'dashboard' && (
+          <div className="mt-8">
+            <div className="card bg-white border border-gray-300 shadow-lg">
+              <div className="card-body">
+                <h2 className="card-title text-xl text-gray-800 mb-6">
+                  👥 Mis Estudiantes
+                </h2>
+                <ProfesorGestionEstudiantes />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Gráfico Top 10 Estudiantes */}
+        {categoriaAsignada && topEstudiantesData && (seccionActiva === 'graficos' || seccionActiva === 'dashboard') && (
+          <div className="mt-8 chart-print-container">
+            <div className="card bg-white border border-gray-300 shadow-lg">
+              <div className="card-body">
+             <div className="flex justify-between items-center mb-6">
+               <h2 className="card-title text-xl text-gray-800">
+                 🏆 Top 10 Estudiantes - Mejores Notas
+               </h2>
+               <div className="flex gap-2">
+                 <button
+                   onClick={loadTopEstudiantes}
+                   className="btn btn-sm btn-outline"
+                 >
+                   🔄 Actualizar
+                 </button>
+                 <button
+                   onClick={async () => {
+                     try {
+                       // Obtener el canvas del gráfico
+                       const chartCanvas = document.querySelector('.chart-print-container canvas')
+                       
+                       if (!chartCanvas) {
+                         Swal.fire({
+                           icon: 'error',
+                           title: 'Error',
+                           text: 'No se pudo encontrar el gráfico para imprimir',
+                           confirmButtonColor: '#dc3545'
+                         })
+                         return
+                       }
+
+                       // Convertir canvas a imagen
+                       const chartImage = chartCanvas.toDataURL('image/png')
+                       
+                       // Crear una nueva ventana para imprimir
+                       const printWindow = window.open('', '_blank')
+                       
+                       printWindow.document.write(`
+                         <html>
+                           <head>
+                             <title>Top 10 Estudiantes - Mejores Notas</title>
+                             <style>
+                               body { 
+                                 font-family: Arial, sans-serif; 
+                                 margin: 0; 
+                                 padding: 20px;
+                                 background: white;
+                               }
+                               .print-container { 
+                                 max-width: 800px;
+                                 margin: 0 auto;
+                                 border: 1px solid #ccc; 
+                                 border-radius: 8px; 
+                                 padding: 30px; 
+                                 box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                               }
+                               .header { 
+                                 text-align: center;
+                                 margin-bottom: 30px;
+                                 border-bottom: 2px solid #4d3930;
+                                 padding-bottom: 20px;
+                               }
+                               .card-title { 
+                                 font-size: 2rem; 
+                                 font-weight: bold; 
+                                 color: #4d3930; 
+                                 margin: 0 0 15px 0;
+                               }
+                               .info-section {
+                                 display: flex;
+                                 justify-content: space-between;
+                                 margin-bottom: 30px;
+                                 font-size: 1.1rem;
+                               }
+                               .info-item {
+                                 flex: 1;
+                                 text-align: center;
+                               }
+                               .chart-container {
+                                 text-align: center;
+                                 margin: 20px 0;
+                               }
+                               .chart-image {
+                                 max-width: 100%;
+                                 height: auto;
+                                 border: 1px solid #ddd;
+                                 border-radius: 8px;
+                                 box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+                               }
+                               .footer {
+                                 text-align: center;
+                                 color: #666;
+                                 margin-top: 30px;
+                                 font-size: 0.9rem;
+                                 border-top: 1px solid #eee;
+                                 padding-top: 20px;
+                               }
+                               @media print {
+                                 body { margin: 0; padding: 15px; }
+                                 .print-container { box-shadow: none; border: 2px solid #000; }
+                                 .card-title { font-size: 1.8rem; }
+                               }
+                             </style>
+                           </head>
+                           <body>
+                             <div class="print-container">
+                               <div class="header">
+                                 <h1 class="card-title">🏆 Top 10 Estudiantes - Mejores Notas</h1>
+                               </div>
+                               
+                               <div class="info-section">
+                                 <div class="info-item">
+                                   <strong>Categoría:</strong><br>
+                                   ${typeof categoriaAsignada === 'string' ? categoriaAsignada : categoriaAsignada.nombre}
+                                 </div>
+                                 <div class="info-item">
+                                   <strong>Fecha de impresión:</strong><br>
+                                   ${new Date().toLocaleDateString('es-CR')}
+                                 </div>
+                                 <div class="info-item">
+                                   <strong>Estudiantes:</strong><br>
+                                   ${topEstudiantesData.labels.length} registros
+                                 </div>
+                               </div>
+                               
+                               <div class="chart-container">
+                                 <img src="${chartImage}" alt="Gráfico Top 10 Estudiantes" class="chart-image" />
+                               </div>
+                               
+                               <div class="footer">
+                                 <p><strong>Sistema de Admisión 2025</strong></p>
+                                 <p>Este documento muestra los estudiantes con las mejores notas de la categoría asignada al profesor.</p>
+                               </div>
+                             </div>
+                           </body>
+                         </html>
+                       `)
+                       
+                       printWindow.document.close()
+                       printWindow.focus()
+                       
+                       // Esperar a que se cargue la imagen antes de imprimir
+                       setTimeout(() => {
+                         printWindow.print()
+                         printWindow.close()
+                       }, 1000)
+                       
+                     } catch (error) {
+                       console.error('Error al imprimir:', error)
+                       Swal.fire({
+                         icon: 'error',
+                         title: 'Error',
+                         text: 'Ocurrió un error al generar la impresión',
+                         confirmButtonColor: '#dc3545'
+                       })
+                     }
+                   }}
+                   className="btn btn-sm btn-primary"
+                 >
+                   🖨️ Imprimir
+                 </button>
+               </div>
+             </div>
+                
+                <div className="h-96">
+                  <Bar 
+                    data={topEstudiantesData}
+                    options={{
+                      responsive: true,
+                      maintainAspectRatio: false,
+                      plugins: {
+                        title: {
+                          display: true,
+                          text: `Top 10 Estudiantes con Mejores Notas - ${typeof categoriaAsignada === 'string' ? categoriaAsignada : categoriaAsignada.nombre}`,
+                          font: {
+                            size: 16,
+                            weight: 'bold'
+                          },
+                          color: '#4d3930'
+                        },
+                        legend: {
+                          display: false
+                        },
+                        tooltip: {
+                          callbacks: {
+                            title: function(context) {
+                              return `Estudiante: ${context[0].label}`
+                            },
+                         label: function(context) {
+                           return `Nota: ${context.parsed.y}`
+                         }
+                          }
+                        }
+                      },
+                      scales: {
+                        y: {
+                          beginAtZero: true,
+                       max: 100,
+                       title: {
+                         display: true,
+                         text: 'Nota Obtenida',
+                         font: {
+                           weight: 'bold'
+                         },
+                         color: '#4d3930'
+                       },
+                          grid: {
+                            color: 'rgba(0,0,0,0.1)'
+                          }
+                        },
+                        x: {
+                          title: {
+                            display: true,
+                            text: 'Estudiantes',
+                            font: {
+                              weight: 'bold'
+                            },
+                            color: '#4d3930'
+                          },
+                          ticks: {
+                            maxRotation: 45,
+                            minRotation: 45,
+                            font: {
+                              size: 10
+                            }
+                          }
+                        }
+                      }
+                    }}
+                  />
+                </div>
+                
+                <div className="mt-4 text-center">
+                  <p className="text-sm text-gray-600">
+                    Gráfico que muestra los 10 estudiantes con las mejores notas de la categoría
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Mensaje cuando no hay datos para el gráfico */}
+        {categoriaAsignada && !topEstudiantesData && (
+          <div className="mt-8">
+            <div className="card bg-white border border-gray-300 shadow-lg">
+              <div className="card-body">
+                <div className="text-center py-8">
+                  <div className="text-6xl mb-4">📊</div>
+                  <h3 className="text-lg font-semibold text-gray-700 mb-2">
+                    No hay datos para mostrar
+                  </h3>
+                  <p className="text-gray-500">
+                    Los estudiantes de esta categoría aún no han realizado pruebas.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Sección de Mis Preguntas - Vista individual */}
+        {seccionActiva === 'preguntas' && (
+          <div className="mt-8">
+            <ProfesorGestionPreguntas />
+          </div>
+        )}
+
+        {/* Sección de Mis Estudiantes - Vista individual */}
+        {seccionActiva === 'estudiantes' && (
+          <div className="mt-8">
+            <ProfesorGestionEstudiantes />
+          </div>
+        )}
       </div>
+
+      {/* Botón flotante para regresar al inicio */}
+      {seccionActiva !== 'dashboard' && (
+        <button
+          onClick={irAInicio}
+          className="fixed bottom-6 right-6 btn btn-circle btn-primary shadow-lg z-50"
+          title="Regresar al inicio"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
+          </svg>
+        </button>
+      )}
     </div>
   )
 }
