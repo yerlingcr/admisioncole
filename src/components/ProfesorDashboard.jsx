@@ -66,23 +66,17 @@ const ProfesorDashboard = () => {
 
   const loadCategoriaAsignada = async (identificacion) => {
     try {
-      console.log('🔍 Cargando categorías para:', identificacion)
       const categorias = await usuarioCategoriasService.getCategoriasByUsuario(identificacion)
-      console.log('📚 Categorías obtenidas:', categorias)
       
       if (categorias && categorias.length > 0 && categorias[0]) {
-        console.log('✅ Primera categoría:', categorias[0])
         setCategoriaAsignada(categorias[0])
         
         // La categoría puede venir como string o como objeto
         const nombreCategoria = typeof categorias[0] === 'string' ? categorias[0] : categorias[0].nombre
-        console.log('📝 Nombre de categoría a usar:', nombreCategoria)
         
         if (nombreCategoria) {
           setCategoriaAsignada(nombreCategoria)
         }
-      } else {
-        console.log('❌ No se encontraron categorías')
       }
     } catch (error) {
       console.error('Error cargando categoría asignada:', error)
@@ -91,8 +85,6 @@ const ProfesorDashboard = () => {
 
   const loadEstadisticas = async (categoria) => {
     try {
-      console.log('📊 Cargando estadísticas para categoría:', categoria)
-      console.log('👤 Usuario para estadísticas:', userInfo?.identificacion)
       
       // Cargar todas las preguntas de la categoría
       const { data: preguntasData, count: totalPreguntas } = await supabase
@@ -102,7 +94,6 @@ const ProfesorDashboard = () => {
         .eq('activa', true)
         .order('fecha_creacion', { ascending: false })
 
-      console.log('📚 Preguntas encontradas:', totalPreguntas, preguntasData)
 
       // Contar preguntas creadas por este profesor
       const { data: preguntasCreadasData, count: preguntasCreadas } = await supabase
@@ -111,10 +102,6 @@ const ProfesorDashboard = () => {
         .eq('usuario_creador', userInfo?.identificacion)
         .eq('categoria', categoria)
 
-      console.log('👨‍🏫 Preguntas creadas por profesor:', preguntasCreadas, 'Usuario:', userInfo?.identificacion)
-      console.log('📝 Datos de preguntas creadas:', preguntasCreadasData)
-      console.log('🔍 Categoría buscada:', categoria)
-      console.log('🔍 Usuario completo:', userInfo)
 
       // Cargar estudiantes de la categoría con sus datos completos
       const { data: estudiantesCategoriaData } = await supabase
@@ -138,19 +125,8 @@ const ProfesorDashboard = () => {
       const estudiantesCategoria = estudiantesCategoriaData?.map(item => item.usuarios) || []
       const totalEstudiantes = estudiantesCategoria.length
 
-      console.log('👥 Estudiantes encontrados:', totalEstudiantes, estudiantesCategoria.map(e => e.identificacion))
-
       // Contar estudiantes activos (estado = 'Activo')
       const estudiantesActivosCount = estudiantesCategoria.filter(e => e.estado === 'Activo').length
-
-      console.log('👥 Estudiantes activos (estado):', estudiantesActivosCount)
-
-      console.log('📊 Estadísticas finales:', {
-        totalPreguntas: totalPreguntas || 0,
-        preguntasCreadas: preguntasCreadas || 0,
-        totalEstudiantes,
-        estudiantesActivos: estudiantesActivosCount
-      })
 
       setEstadisticas({
         totalPreguntas: totalPreguntas || 0,
@@ -211,7 +187,6 @@ const ProfesorDashboard = () => {
         if (progressText) progressText.textContent = text
       }
       
-      console.log('🔍 Cargando detalles para estudiante:', estudiante.identificacion)
       updateProgress(10, 'Buscando intentos del estudiante...')
       
       // Obtener el intento más reciente del estudiante
@@ -228,13 +203,11 @@ const ProfesorDashboard = () => {
       }
 
       if (!intentos || intentos.length === 0) {
-        console.log('⚠️ No se encontraron intentos para el estudiante')
         setDetallesPrueba(null)
         return
       }
 
       const intento = intentos[0]
-      console.log('✅ Intento encontrado:', intento.id)
       updateProgress(30, 'Obteniendo respuestas del estudiante...')
 
       // Obtener las respuestas del estudiante
@@ -248,7 +221,6 @@ const ProfesorDashboard = () => {
         throw errorRespuestas
       }
 
-      console.log('✅ Respuestas encontradas:', respuestas?.length || 0)
       updateProgress(50, 'Obteniendo preguntas de la categoría...')
 
       // Obtener todas las preguntas de la categoría
@@ -262,7 +234,6 @@ const ProfesorDashboard = () => {
         throw errorPreguntas
       }
 
-      console.log('✅ Preguntas encontradas:', preguntasCategoria?.length || 0)
       updateProgress(70, 'Procesando respuestas...')
 
       // Procesar las respuestas para obtener información completa
@@ -293,7 +264,6 @@ const ProfesorDashboard = () => {
         }
       }
       
-      console.log('✅ Respuestas completas procesadas:', respuestasCompletas.length)
       updateProgress(85, 'Cargando opciones de respuesta...')
 
       // Procesar preguntas con sus opciones
@@ -321,7 +291,6 @@ const ProfesorDashboard = () => {
         todasLasPreguntas: preguntasConOpciones
       })
 
-      console.log('✅ Detalles cargados exitosamente')
       updateProgress(100, '¡Completado!')
       
       setTimeout(() => {
@@ -552,7 +521,6 @@ const ProfesorDashboard = () => {
     
     try {
       setLoadingNotas(true)
-      console.log('📊 Cargando notas de estudiantes para categoría:', categoriaAsignada)
       
       // Obtener configuración activa (mínimo y total de preguntas)
       const { data: config, error: configError } = await supabase
@@ -563,8 +531,6 @@ const ProfesorDashboard = () => {
       
       const puntuacionMinima = config?.puntuacion_minima_aprobacion || 70
       const totalPreguntas = config?.total_preguntas || 5
-      console.log('📊 Puntuación mínima para aprobar:', puntuacionMinima)
-      console.log('🧮 Total de preguntas configuradas:', totalPreguntas)
 
       // Obtener porcentaje de la prueba para la categoría
       const nombreCategoria = typeof categoriaAsignada === 'string' ? categoriaAsignada : categoriaAsignada
@@ -577,7 +543,6 @@ const ProfesorDashboard = () => {
       const porcentajePrueba = Array.isArray(categoriaInfo) && categoriaInfo.length > 0
         ? (categoriaInfo[0]?.porcentaje_prueba || 0)
         : 0
-      console.log('📈 Porcentaje de la prueba para la categoría:', porcentajePrueba)
       
       // Obtener estudiantes de la categoría del profesor
       const { data: estudiantesCategoria, error: errorEstudiantes } = await supabase
@@ -595,7 +560,6 @@ const ProfesorDashboard = () => {
         return
       }
 
-      console.log('👥 Estudiantes encontrados:', estudiantesCategoria?.length || 0)
 
       if (!estudiantesCategoria || estudiantesCategoria.length === 0) {
         setNotasEstudiantes([])
@@ -616,7 +580,6 @@ const ProfesorDashboard = () => {
         return
       }
 
-      console.log('📝 Intentos encontrados:', intentos?.length || 0)
 
       // Procesar datos para obtener la mejor nota de cada estudiante
       const notasConEstudiantes = estudiantesCategoria.map(estudiante => {
@@ -648,7 +611,6 @@ const ProfesorDashboard = () => {
       notasConEstudiantes.sort((a, b) => b.notaObtenida - a.notaObtenida)
 
       setNotasEstudiantes(notasConEstudiantes)
-      console.log('📊 Notas cargadas:', notasConEstudiantes)
       
     } catch (error) {
       console.error('❌ Error cargando notas:', error)
@@ -1317,6 +1279,7 @@ const ProfesorDashboard = () => {
                   const respuestaEstudiante = detallesPrueba.respuestas.find(r => 
                     r.pregunta.id === pregunta.id
                   )
+                  
 
                   return (
                     <div key={pregunta.id} className="border border-gray-200 rounded-lg p-4">
@@ -1344,6 +1307,7 @@ const ProfesorDashboard = () => {
                           const esRespuestaEstudiante = respuestaEstudiante && respuestaEstudiante.opcion_seleccionada_id === opcion.id
                           const esCorrecta = opcion.es_correcta
                           
+                          
                           return (
                             <div
                               key={opcion.id}
@@ -1363,14 +1327,10 @@ const ProfesorDashboard = () => {
                                 </span>
                                 <span className="flex-1">{opcion.texto_opcion}</span>
                                 {esRespuestaEstudiante && (
-                                  <span className="ml-2 text-sm font-medium text-blue-600">
-                                    ✓ (R/ Estudiante)
-                                  </span>
+                                  <span className="badge badge-sm ml-2">Tu respuesta</span>
                                 )}
                                 {esCorrecta && (
-                                  <span className="ml-2 text-sm font-medium text-green-600">
-                                    ✓ (Correcta)
-                                  </span>
+                                  <span className="badge badge-sm badge-success ml-2">Correcta</span>
                                 )}
                               </div>
                             </div>

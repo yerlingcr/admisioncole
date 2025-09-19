@@ -190,9 +190,7 @@ const GestionUsuarios = () => {
   // Funciones para manejar categorías
   const loadCategoriasDisponibles = async () => {
     try {
-      console.log('🔍 Cargando categorías disponibles...')
       const categorias = await usuarioCategoriasService.getCategoriasDisponibles()
-      console.log('📚 Categorías obtenidas:', categorias)
       setCategoriasDisponibles(categorias)
     } catch (error) {
       console.error('❌ Error cargando categorías disponibles:', error)
@@ -349,7 +347,6 @@ const GestionUsuarios = () => {
     
     try {
       setLoading(true)
-      console.log('🚀 Guardando usuario...')
 
       if (editingUsuario) {
         // Actualizar usuario existente
@@ -372,12 +369,9 @@ const GestionUsuarios = () => {
           .eq('identificacion', editingUsuario.identificacion)
 
         if (error) throw error
-        console.log('✅ Usuario actualizado')
 
         // Si es un estudiante o profesor, también actualizar sus categorías
         if (formData.rol === 'Estudiante' || formData.rol === 'Profesor') {
-          console.log('🔍 Actualizando categorías para', formData.rol.toLowerCase(), ':', editingUsuario.identificacion)
-          console.log('📚 Categorías a asignar:', categoriasUsuario)
           
           const result = await usuarioCategoriasService.asignarCategorias(
             editingUsuario.identificacion,
@@ -388,7 +382,6 @@ const GestionUsuarios = () => {
           if (!result.success) {
             console.error('❌ Error actualizando categorías:', result.error)
           } else {
-            console.log('✅ Categorías actualizadas correctamente')
           }
         }
       } else {
@@ -403,12 +396,9 @@ const GestionUsuarios = () => {
           .insert(usuarioData)
 
         if (error) throw error
-        console.log('✅ Usuario creado')
 
         // Si es un estudiante o profesor, también asignar sus categorías
         if (formData.rol === 'Estudiante' || formData.rol === 'Profesor') {
-          console.log('🔍 Asignando categorías para nuevo', formData.rol.toLowerCase(), ':', formData.identificacion)
-          console.log('📚 Categorías a asignar:', categoriasUsuario)
           
           const result = await usuarioCategoriasService.asignarCategorias(
             formData.identificacion,
@@ -419,7 +409,6 @@ const GestionUsuarios = () => {
           if (!result.success) {
             console.error('❌ Error asignando categorías:', result.error)
           } else {
-            console.log('✅ Categorías asignadas correctamente')
           }
         }
       }
@@ -477,10 +466,7 @@ const GestionUsuarios = () => {
     // Si es un estudiante o profesor, cargar sus categorías actuales
     if (usuario.rol === 'Estudiante' || usuario.rol === 'Profesor') {
       try {
-        console.log('🔍 Cargando categorías del', usuario.rol.toLowerCase(), ':', usuario.identificacion)
         const categoriasActuales = await usuarioCategoriasService.getCategoriasByUsuario(usuario.identificacion)
-        console.log('📚 Categorías actuales del', usuario.rol.toLowerCase(), ':', categoriasActuales)
-        console.log('📚 Categorías disponibles:', categoriasDisponibles)
         setCategoriasUsuario(categoriasActuales)
       } catch (error) {
         console.error('❌ Error cargando categorías del', usuario.rol.toLowerCase(), ':', error)

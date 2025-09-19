@@ -56,18 +56,13 @@ const ProfesorGestionEstudiantes = () => {
 
   const loadCategoriaAsignada = async (identificacion) => {
     try {
-      console.log('🔍 ProfesorGestionEstudiantes - Cargando categoría para profesor:', identificacion)
       const categorias = await usuarioCategoriasService.getCategoriasByUsuario(identificacion)
-      console.log('📚 ProfesorGestionEstudiantes - Categorías encontradas:', categorias)
-      
       if (categorias && categorias.length > 0) {
         const categoria = categorias[0]
-        console.log('✅ ProfesorGestionEstudiantes - Categoría asignada:', categoria)
         setCategoriaAsignada(categoria)
         setFormData(prev => ({ ...prev, categoria: categoria }))
         await loadEstudiantes(categoria)
       } else {
-        console.log('⚠️ ProfesorGestionEstudiantes - No se encontraron categorías para el profesor')
       }
     } catch (error) {
       console.error('❌ ProfesorGestionEstudiantes - Error cargando categoría asignada:', error)
@@ -77,7 +72,6 @@ const ProfesorGestionEstudiantes = () => {
   const loadEstudiantes = async (categoria) => {
     try {
       setLoading(true)
-      console.log('🔍 ProfesorGestionEstudiantes - Cargando estudiantes para la categoría:', categoria)
       
       // Primero obtener los IDs de estudiantes de la categoría
       const { data: categoriaData, error: categoriaError } = await supabase
@@ -91,10 +85,8 @@ const ProfesorGestionEstudiantes = () => {
         throw categoriaError
       }
 
-      console.log('📋 ProfesorGestionEstudiantes - IDs de usuarios en categoría:', categoriaData)
 
       if (!categoriaData || categoriaData.length === 0) {
-        console.log('⚠️ ProfesorGestionEstudiantes - No hay usuarios en esta categoría')
         setEstudiantes([])
         return
       }
@@ -113,7 +105,6 @@ const ProfesorGestionEstudiantes = () => {
         throw estudiantesError
       }
 
-      console.log('👥 ProfesorGestionEstudiantes - Estudiantes encontrados:', estudiantesData?.length || 0, estudiantesData)
 
       const estudiantesCategoria = estudiantesData?.map(estudiante => ({
         ...estudiante,
@@ -122,7 +113,6 @@ const ProfesorGestionEstudiantes = () => {
       })) || []
 
       setEstudiantes(estudiantesCategoria)
-      console.log('✅ ProfesorGestionEstudiantes - Estados actualizados - Estudiantes:', estudiantesCategoria.length)
     } catch (error) {
       console.error('❌ ProfesorGestionEstudiantes - Error cargando estudiantes:', error)
       setEstudiantes([])
@@ -160,11 +150,7 @@ const ProfesorGestionEstudiantes = () => {
     })
     
     try {
-      console.log('🚀 Iniciando guardado de estudiante...')
-      console.log('📝 Datos del formulario:', formData)
-
       if (editingEstudiante) {
-        console.log('✏️ Editando estudiante existente...')
         
         // Actualizar usuario
         const { error: usuarioError } = await supabase
@@ -180,9 +166,7 @@ const ProfesorGestionEstudiantes = () => {
 
         if (usuarioError) throw usuarioError
 
-        console.log('✅ Estudiante actualizado exitosamente')
       } else {
-        console.log('🆕 Creando nuevo estudiante...')
         
         // Crear usuario
         const usuarioData = {
@@ -225,7 +209,6 @@ const ProfesorGestionEstudiantes = () => {
 
         if (categoriaError) throw categoriaError
 
-        console.log('✅ Estudiante creado exitosamente')
       }
 
       // Actualizar la lista localmente sin recargar toda la página
@@ -364,7 +347,6 @@ const ProfesorGestionEstudiantes = () => {
       // Actualizar la lista localmente sin recargar toda la página
       setEstudiantes(prev => prev.filter(e => e.identificacion !== estudiante.identificacion))
       
-      console.log('✅ Estudiante eliminado exitosamente')
       
       // Mostrar mensaje de éxito
       Swal.fire({

@@ -46,7 +46,6 @@ const Estadisticas = () => {
   const loadEstadisticas = async () => {
     try {
       setLoading(true)
-      console.log('📊 Cargando estadísticas...')
 
       // Simplificar consultas para evitar errores
       let estadisticasData = {
@@ -88,19 +87,13 @@ const Estadisticas = () => {
         }
 
         // Obtener estadísticas de intentos
-        console.log('🔍 Iniciando consulta de intentos...')
         const { data: intentos, error: errorIntentos } = await supabase
           .from('intentos_quiz')
           .select('*')
 
         if (!errorIntentos && intentos) {
-          console.log('📊 Intentos encontrados:', intentos.length)
-          console.log('📊 Intentos con datos:', intentos)
-          
           estadisticasData.intentosRealizados = intentos.length
           estadisticasData.intentosCompletados = intentos.filter(i => i.fecha_fin !== null).length
-          
-          console.log('📊 Intentos completados:', estadisticasData.intentosCompletados)
           
           // Obtener puntuación mínima de configuración
           const { data: config, error: configError } = await supabase
@@ -110,7 +103,6 @@ const Estadisticas = () => {
             .single()
           
           const puntuacionMinima = config?.puntuacion_minima_aprobacion || 70
-          console.log('📊 Puntuación mínima para aprobar:', puntuacionMinima)
           
           const intentosAprobados = intentos.filter(i => 
             i.fecha_fin !== null && 
@@ -118,13 +110,11 @@ const Estadisticas = () => {
             i.puntuacion_total >= puntuacionMinima
           ).length
           
-          console.log('📊 Intentos aprobados:', intentosAprobados)
           
           estadisticasData.tasaAprobacion = estadisticasData.intentosCompletados > 0 
             ? (intentosAprobados / estadisticasData.intentosCompletados) * 100 
             : 0
 
-          console.log('📊 Tasa de aprobación calculada:', estadisticasData.tasaAprobacion)
 
           // Calcular tiempo promedio basado en fecha_inicio y fecha_fin
           const intentosConTiempo = intentos.filter(i => i.fecha_inicio && i.fecha_fin)
@@ -146,7 +136,6 @@ const Estadisticas = () => {
         }
 
         // Cargar estadísticas por categorías
-        console.log('🔍 Cargando estadísticas por categorías...')
         try {
           // Obtener todas las categorías
           const { data: categorias, error: errorCategorias } = await supabase
@@ -219,7 +208,6 @@ const Estadisticas = () => {
             }
 
             estadisticasData.categoriasConEstudiantes = categoriasConEstadisticas
-            console.log('📊 Estadísticas por categorías cargadas:', categoriasConEstadisticas)
           }
         } catch (errorCategorias) {
           console.error('❌ Error cargando estadísticas por categorías:', errorCategorias)
@@ -235,10 +223,6 @@ const Estadisticas = () => {
       // Cargar datos para la gráfica de rendimiento de estudiantes
       await loadChartData()
 
-      console.log('✅ Estadísticas cargadas correctamente')
-      console.log('📊 Datos finales de estadísticas:', estadisticasData)
-      console.log('📊 Categorías con estudiantes:', estadisticasData.categoriasConEstudiantes)
-      console.log('📊 Longitud de categorías:', estadisticasData.categoriasConEstudiantes?.length)
 
     } catch (error) {
       console.error('❌ Error cargando estadísticas:', error)
@@ -262,7 +246,6 @@ const Estadisticas = () => {
 
   const loadChartData = async () => {
     try {
-      console.log('📊 Cargando datos para gráfica...')
 
       // Obtener intentos completados con puntuaciones
       const { data: intentos, error } = await supabase
@@ -282,7 +265,6 @@ const Estadisticas = () => {
         return
       }
 
-      console.log('📊 Intentos encontrados para gráfica:', intentos?.length || 0)
 
       if (intentos && intentos.length > 0) {
         // Procesar datos para gráfico de pastel - contar estudiantes por categoría
@@ -325,8 +307,6 @@ const Estadisticas = () => {
         // Ordenar por cantidad (mayor a menor)
         categoriasConConteos.sort((a, b) => b.cantidad - a.cantidad)
 
-        console.log('📊 Categorías procesadas:', categoriasConConteos.length)
-        console.log('📊 Datos de categorías:', categoriasConConteos)
 
         // Crear datos para Chart.js (gráfico de pastel)
         const chartData = {
@@ -354,9 +334,6 @@ const Estadisticas = () => {
         }
 
         setChartData(chartData)
-        console.log('📊 Datos de gráfica cargados:', chartData)
-        console.log('📊 Labels:', chartData.labels)
-        console.log('📊 Data:', chartData.datasets[0].data)
       }
     } catch (error) {
       console.error('Error en loadChartData:', error)
@@ -428,8 +405,6 @@ const Estadisticas = () => {
     )
   }
 
-  // Debug temporal
-  console.log('🔍 Estado actual:', { loading, estadisticas })
 
   return (
     <div className="p-6">
@@ -554,7 +529,7 @@ const Estadisticas = () => {
             📊 Estadísticas por Categorías
           </h3>
           
-          {console.log('🔍 Verificando categorías:', estadisticas.categoriasConEstudiantes) || estadisticas.categoriasConEstudiantes.length > 0 ? (
+          {estadisticas.categoriasConEstudiantes.length > 0 ? (
             <div className="overflow-x-auto">
               <table className="table table-zebra w-full">
                 <thead>

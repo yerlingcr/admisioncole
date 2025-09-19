@@ -98,7 +98,7 @@ const Login = () => {
 
               {/* Footer del Panel Izquierdo - Solo visible en desktop */}
               <div className="hidden lg:block text-center text-white text-sm relative z-10">
-                <p className="drop-shadow-xl font-medium">© 2025 Sistema de Admisión, ver. 1.0</p>
+                <p className="drop-shadow-xl font-medium">© 2025 Sistema de Admisión, ver. 1.0.1</p>
                 <p className="drop-shadow-xl font-medium">
                   Desarrollado por{' '}
                   <a 

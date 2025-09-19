@@ -35,7 +35,6 @@ const EstudianteDashboard = () => {
 
   useEffect(() => {
     if (userInfo?.identificacion) {
-      console.log('🚀 Cargando datos iniciales para:', userInfo.identificacion);
       checkQuizStatus()
       loadQuizConfig()
       loadInformacionInstitucional()
@@ -81,10 +80,8 @@ const EstudianteDashboard = () => {
 
   const refreshUserStatus = async () => {
     try {
-      console.log('🔄 Actualizando estado del usuario...')
       const info = await getUserInfo()
       setUserInfo(info)
-      console.log('✅ Estado actualizado:', info?.estado)
       
       // También actualizar la categoría
       await loadCategoriaEstudiante()
@@ -192,11 +189,9 @@ const EstudianteDashboard = () => {
   const loadIntentosUsados = async () => {
     try {
       if (!userInfo?.identificacion) {
-        console.log('⚠️ No hay identificacion del usuario para cargar intentos');
         return;
       }
 
-      console.log('🔍 Buscando intentos para:', userInfo.identificacion);
       
       // Consulta simple solo para contar intentos completados
       const { data, error } = await supabase
@@ -211,10 +206,8 @@ const EstudianteDashboard = () => {
         return;
       }
 
-      console.log('📊 Intentos encontrados en BD:', data.length);
       setIntentosUsados(data.length);
       
-      console.log('✅ Estado actualizado - intentosUsados:', data.length);
     } catch (error) {
       console.error('❌ Error en loadIntentosUsados:', error);
       setIntentosUsados(0);
@@ -274,11 +267,9 @@ const EstudianteDashboard = () => {
 
   const testDatabaseConnection = async () => {
     if (!userInfo?.identificacion) {
-      console.log('⚠️ No hay userInfo para probar conexión');
       return;
     }
 
-    console.log('🧪 Probando conexión directa a la base de datos...');
     
     try {
       // Consulta directa sin filtros
@@ -292,21 +283,6 @@ const EstudianteDashboard = () => {
         return;
       }
 
-      console.log('📊 Todos los intentos en BD:', allData);
-      console.log('📊 Cantidad total de intentos:', allData.length);
-      
-      // Mostrar detalles de cada intento
-      allData.forEach((intento, index) => {
-        console.log(`📊 Intento ${index + 1}:`, {
-          id: intento.id,
-          estudiante_id: intento.estudiante_id,
-          fecha_inicio: intento.fecha_inicio,
-          fecha_fin: intento.fecha_fin,
-          puntuacion_total: intento.puntuacion_total,
-          tiene_fecha_fin: !!intento.fecha_fin,
-          es_completado: intento.fecha_fin !== null
-        });
-      });
       
       // Consulta solo completados
       const { data: completedData, error: completedError } = await supabase
@@ -320,11 +296,6 @@ const EstudianteDashboard = () => {
         return;
       }
 
-      console.log('✅ Intentos completados en BD:', completedData);
-      console.log('📊 Cantidad de completados:', completedData.length);
-      
-      // Alert para mostrar resultados
-      alert(`Resultados de la verificación:\n\nTotal de intentos: ${allData.length}\nIntentos completados: ${completedData.length}\n\nRevisa la consola para más detalles.`);
       
     } catch (error) {
       console.error('❌ Error en test de conexión:', error);

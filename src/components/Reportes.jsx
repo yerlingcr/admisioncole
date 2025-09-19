@@ -49,10 +49,7 @@ const Reportes = () => {
   const loadDatosReporte = async () => {
     try {
       setLoading(true)
-      console.log('📊 Cargando datos para reporte...')
-
       // Consulta simplificada para obtener intentos completados
-      console.log('🔍 Iniciando consulta de reportes...')
       let query = supabase
         .from('intentos_quiz')
         .select('*')
@@ -66,7 +63,6 @@ const Reportes = () => {
         throw error
       }
 
-      console.log('📊 Intentos encontrados:', intentos?.length || 0)
 
       if (!intentos || intentos.length === 0) {
         setDatosReporte([])
@@ -168,7 +164,6 @@ const Reportes = () => {
       const datosFinales = datosProcesados.filter(item => item !== null)
 
       setDatosReporte(datosFinales)
-      console.log('📊 Datos cargados para reporte:', datosFinales.length, 'registros')
 
     } catch (error) {
       console.error('❌ Error cargando datos del reporte:', error)
@@ -232,10 +227,6 @@ const Reportes = () => {
         if (progressText) progressText.textContent = text
       }
       
-      console.log('🔍 Cargando detalles para estudiante:', estudiante.identificacion)
-      console.log('🔍 Estudiante recibido:', estudiante)
-      console.log('🔍 Categoria del estudiante:', estudiante.categoria)
-      console.log('🔍 CategoriaId del estudiante:', estudiante.categoriaId)
       updateProgress(10, 'Buscando intentos del estudiante...')
       
       // Obtener el intento más reciente del estudiante
@@ -252,17 +243,14 @@ const Reportes = () => {
       }
 
       if (!intentos || intentos.length === 0) {
-        console.log('⚠️ No se encontraron intentos para el estudiante')
         setDetallesPrueba(null)
         return
       }
 
       const intento = intentos[0]
-      console.log('✅ Intento encontrado:', intento.id)
       updateProgress(30, 'Obteniendo respuestas del estudiante...')
 
       // Verificar si la tabla respuestas_estudiante existe y tiene datos
-      console.log('🔍 Verificando tabla respuestas_estudiante...')
       
       const { data: respuestas, error: errorRespuestas } = await supabase
         .from('respuestas_estudiante')
@@ -271,25 +259,6 @@ const Reportes = () => {
 
       if (errorRespuestas) {
         console.error('❌ Error obteniendo respuestas:', errorRespuestas)
-        console.error('❌ Detalles del error:', {
-          message: errorRespuestas.message,
-          details: errorRespuestas.details,
-          hint: errorRespuestas.hint,
-          code: errorRespuestas.code
-        })
-        
-        // Intentar una consulta más simple para diagnosticar
-        console.log('🔍 Intentando consulta de diagnóstico...')
-        const { data: testData, error: testError } = await supabase
-          .from('respuestas_estudiante')
-          .select('*')
-          .limit(1)
-        
-        if (testError) {
-          console.error('❌ La tabla respuestas_estudiante no existe o no es accesible:', testError)
-        } else {
-          console.log('✅ La tabla respuestas_estudiante existe, pero no hay datos para este intento')
-        }
         
         // Continuar sin respuestas
         setDetallesPrueba({
@@ -300,13 +269,9 @@ const Reportes = () => {
         return
       }
 
-      console.log('✅ Respuestas encontradas:', respuestas?.length || 0)
       updateProgress(50, 'Obteniendo preguntas de la categoría...')
 
       // Obtener todas las preguntas de la categoría
-      console.log('🔍 Obteniendo preguntas para categoría:', estudiante.categoria)
-      console.log('🔍 Objeto estudiante completo:', estudiante)
-      console.log('🔍 Valor de estudiante.categoria:', estudiante.categoria)
       
       const { data: preguntasCategoria, error: errorPreguntas } = await supabase
         .from('preguntas_quiz')
@@ -324,15 +289,12 @@ const Reportes = () => {
         throw errorPreguntas
       }
 
-      console.log('✅ Preguntas encontradas:', preguntasCategoria?.length || 0)
       updateProgress(70, 'Procesando respuestas...')
 
       // Procesar las respuestas para obtener información completa
       const respuestasCompletas = []
       if (respuestas && respuestas.length > 0) {
-        console.log('🔍 Procesando respuestas encontradas...')
         for (const respuesta of respuestas) {
-          console.log('📝 Procesando respuesta:', respuesta)
           
           // Obtener la opción seleccionada
           const { data: opcionSeleccionada, error: errorOpcion } = await supabase
@@ -351,7 +313,6 @@ const Reportes = () => {
             continue
           }
 
-          console.log('✅ Opción seleccionada:', opcionSeleccionada)
 
           // Obtener la pregunta
           const { data: pregunta, error: errorPregunta } = await supabase
@@ -365,7 +326,6 @@ const Reportes = () => {
             continue
           }
 
-          console.log('✅ Pregunta encontrada:', pregunta)
 
           respuestasCompletas.push({
             ...respuesta,
@@ -375,7 +335,6 @@ const Reportes = () => {
         }
       }
       
-      console.log('✅ Respuestas completas procesadas:', respuestasCompletas.length)
       updateProgress(85, 'Cargando opciones de respuesta...')
 
       // Procesar preguntas con sus opciones
@@ -403,7 +362,6 @@ const Reportes = () => {
         todasLasPreguntas: preguntasConOpciones
       })
 
-      console.log('✅ Detalles cargados exitosamente')
       updateProgress(100, '¡Completado!')
       
       // Cerrar el modal de progreso después de un breve delay
@@ -673,7 +631,6 @@ const Reportes = () => {
       // Descargar archivo
       XLSX.writeFile(wb, nombreArchivo)
 
-      console.log('✅ Reporte Excel generado exitosamente')
     } catch (error) {
       console.error('❌ Error generando Excel:', error)
     }
@@ -758,7 +715,6 @@ const Reportes = () => {
       // Descargar archivo
       doc.save(nombreArchivo)
 
-      console.log('✅ Reporte PDF generado exitosamente')
     } catch (error) {
       console.error('❌ Error generando PDF:', error)
     }

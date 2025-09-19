@@ -5,6 +5,11 @@ Todos los cambios notables de este proyecto serán documentados en este archivo.
 El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/),
 y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
+## [1.0.1] - 2025-09-19
+
+### Corregido
+- Limpieza completa de logs de debug del sistema y mejoras en el Ver Prueba de las Notas de Estudiantes de Dashboard de Profesor, donde se incluye la opción correcta y la que marcó el estudiante
+
 ## [1.0.0] - 2025-09-18
 
 ### Agregado

@@ -50,14 +50,12 @@ const AdminDashboard = () => {
         .from('usuarios')
         .select('*')
 
-      console.log('👥 Usuarios obtenidos:', usuariosData?.length || 0, usuariosData)
       
       // Obtener total de preguntas
       const { data: preguntasData, error: preguntasError } = await supabase
         .from('preguntas_quiz')
         .select('*')
 
-      console.log('📝 Preguntas obtenidas:', preguntasData?.length || 0, preguntasData)
 
       // Obtener usuarios activos
       const { data: usuariosActivosData, error: usuariosActivosError } = await supabase
@@ -65,7 +63,6 @@ const AdminDashboard = () => {
         .select('*')
         .eq('estado', 'Activo')
 
-      console.log('✅ Usuarios activos:', usuariosActivosData?.length || 0, usuariosActivosData)
       
       if (usuariosError) {
         console.error('❌ Error cargando usuarios:', usuariosError)
@@ -87,7 +84,6 @@ const AdminDashboard = () => {
         usuarios_inactivos: (usuariosData?.length || 0) - (usuariosActivosData?.length || 0)
       }
       
-      console.log('📊 Estadísticas finales:', statsData)
       setStats(statsData)
     } catch (error) {
       console.error('❌ Error cargando estadísticas:', error)

@@ -182,13 +182,7 @@ const GestionPreguntas = () => {
     
     try {
       setLoading(true)
-      console.log('🚀 Iniciando guardado de pregunta...')
-      console.log('📝 Datos del formulario:', formData)
-      console.log('👤 Usuario:', userInfo)
-
       if (editingPregunta) {
-        console.log('✏️ Editando pregunta existente...')
-        console.log('🆔 ID de pregunta a editar:', editingPregunta.id)
         
         const updateData = {
           pregunta: formData.pregunta,
@@ -207,7 +201,6 @@ const GestionPreguntas = () => {
           .eq('id', editingPregunta.id)
           .select()
 
-        console.log('📊 Respuesta actualización pregunta:', { data: preguntaData, error: preguntaError })
         if (preguntaError) throw preguntaError
 
         // Eliminar opciones existentes
@@ -216,11 +209,9 @@ const GestionPreguntas = () => {
           .delete()
           .eq('pregunta_id', editingPregunta.id)
 
-        console.log('🗑️ Respuesta eliminación opciones:', { error: deleteError })
         if (deleteError) throw deleteError
 
         // Recrear opciones
-        console.log('🔧 Recreando opciones...')
         for (let i = 0; i < formData.opciones.length; i++) {
           const opcion = formData.opciones[i]
           if (opcion.texto_opcion.trim()) {
@@ -231,13 +222,11 @@ const GestionPreguntas = () => {
               orden_mostrar: i + 1
             }
             
-            console.log(`📝 Insertando opción ${i + 1}:`, opcionData)
             
             const { error: opcionError } = await supabase
               .from('opciones_respuesta')
               .insert(opcionData)
 
-            console.log(`📊 Respuesta opción ${i + 1}:`, { error: opcionError })
             if (opcionError) throw opcionError
           }
         }
@@ -260,13 +249,9 @@ const GestionPreguntas = () => {
           .select()
           .single()
 
-        console.log('📊 Respuesta inserción pregunta:', { data: preguntaInsertada, error: preguntaError })
         if (preguntaError) throw preguntaError
 
-        console.log('✅ Pregunta creada, ID:', preguntaInsertada.id)
-
         // Crear opciones
-        console.log('🔧 Creando opciones...')
         for (let i = 0; i < formData.opciones.length; i++) {
           const opcion = formData.opciones[i]
           if (opcion.texto_opcion.trim()) {
@@ -277,13 +262,11 @@ const GestionPreguntas = () => {
               orden_mostrar: i + 1
             }
             
-            console.log(`📝 Insertando opción ${i + 1}:`, opcionData)
             
             const { error: opcionError } = await supabase
               .from('opciones_respuesta')
               .insert(opcionData)
 
-            console.log(`📊 Respuesta opción ${i + 1}:`, { error: opcionError })
             if (opcionError) throw opcionError
           }
         }
@@ -506,7 +489,6 @@ const GestionPreguntas = () => {
 
     try {
       setUploadingImage(true)
-      console.log('🚀 Iniciando subida de imagen...')
 
       const result = await storageService.uploadImage(selectedFile)
       
@@ -516,7 +498,6 @@ const GestionPreguntas = () => {
         if (fileInputRef.current) {
           fileInputRef.current.value = ''
         }
-        console.log('✅ Imagen subida y URL actualizada:', result.publicUrl)
       }
     } catch (error) {
       console.error('❌ Error subiendo imagen:', error)
@@ -547,9 +528,7 @@ const GestionPreguntas = () => {
         if (bucketIndex !== -1 && bucketIndex + 1 < urlParts.length) {
           const filePath = urlParts.slice(bucketIndex + 1).join('/')
           
-          console.log('🗑️ Eliminando imagen del storage:', filePath)
           await storageService.deleteImage(filePath)
-          console.log('✅ Imagen eliminada del storage')
         } else {
           console.error('❌ No se pudo extraer la ruta del archivo de la URL:', formData.imagen_url)
         }

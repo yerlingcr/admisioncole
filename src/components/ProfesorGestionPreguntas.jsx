@@ -69,22 +69,17 @@ const ProfesorGestionPreguntas = () => {
 
   const loadCategoriaAsignada = async (identificacion) => {
     try {
-      console.log('🔍 ProfesorGestionPreguntas - Cargando categorías para:', identificacion)
       const categorias = await usuarioCategoriasService.getCategoriasByUsuario(identificacion)
-      console.log('📚 ProfesorGestionPreguntas - Categorías obtenidas:', categorias)
       
       if (categorias && categorias.length > 0) {
-        console.log('✅ ProfesorGestionPreguntas - Primera categoría:', categorias[0])
         setCategoriaAsignada(categorias[0])
         
         // La categoría puede venir como string o como objeto
         const nombreCategoria = typeof categorias[0] === 'string' ? categorias[0] : categorias[0].nombre
-        console.log('📝 ProfesorGestionPreguntas - Nombre de categoría a usar:', nombreCategoria)
         
         setFormData(prev => ({ ...prev, categoria: nombreCategoria }))
         await loadPreguntas(nombreCategoria)
       } else {
-        console.log('❌ ProfesorGestionPreguntas - No se encontraron categorías')
       }
     } catch (error) {
       console.error('Error cargando categoría asignada:', error)
@@ -94,7 +89,6 @@ const ProfesorGestionPreguntas = () => {
   const loadPreguntas = async (categoria) => {
     try {
       setLoading(true)
-      console.log('🔍 ProfesorGestionPreguntas - Cargando preguntas para la categoría:', categoria)
       
       // Cargar preguntas solo de la categoría asignada
       const { data: preguntasData, error: preguntasError } = await supabase
@@ -107,7 +101,6 @@ const ProfesorGestionPreguntas = () => {
         console.error('❌ Error en consulta de preguntas:', preguntasError)
         throw preguntasError
       }
-      console.log('📚 ProfesorGestionPreguntas - Preguntas encontradas:', preguntasData?.length || 0, preguntasData)
 
       // Cargar opciones para cada pregunta
       const { data: opcionesData, error: opcionesError } = await supabase
@@ -119,11 +112,9 @@ const ProfesorGestionPreguntas = () => {
         console.error('❌ Error en consulta de opciones:', opcionesError)
         throw opcionesError
       }
-      console.log('🔧 ProfesorGestionPreguntas - Opciones encontradas:', opcionesData?.length || 0, opcionesData)
 
       setPreguntas(preguntasData || [])
       setOpciones(opcionesData || [])
-      console.log('✅ ProfesorGestionPreguntas - Estados actualizados - Preguntas:', preguntasData?.length || 0, 'Opciones:', opcionesData?.length || 0)
     } catch (error) {
       console.error('❌ ProfesorGestionPreguntas - Error cargando preguntas:', error)
     } finally {
@@ -179,12 +170,7 @@ const ProfesorGestionPreguntas = () => {
     })
     
     try {
-      console.log('🚀 Iniciando guardado de pregunta...')
-      console.log('📝 Datos del formulario:', formData)
-      console.log('👤 Usuario:', userInfo)
-
       if (editingPregunta) {
-        console.log('✏️ Editando pregunta existente...')
         // Actualizar pregunta existente
         const { data: preguntaData, error: preguntaError } = await supabase
           .from('preguntas_quiz')
@@ -200,7 +186,6 @@ const ProfesorGestionPreguntas = () => {
           .eq('id', editingPregunta.id)
           .select()
 
-        console.log('📊 Respuesta actualización pregunta:', { data: preguntaData, error: preguntaError })
         if (preguntaError) throw preguntaError
 
         // Eliminar opciones existentes
@@ -229,9 +214,7 @@ const ProfesorGestionPreguntas = () => {
           }
         }
 
-        console.log('✅ Pregunta actualizada exitosamente')
       } else {
-        console.log('🆕 Creando nueva pregunta...')
         
         const preguntaData = {
           pregunta: formData.pregunta,
@@ -251,13 +234,9 @@ const ProfesorGestionPreguntas = () => {
           .select()
           .single()
 
-        console.log('📊 Respuesta inserción pregunta:', { data: preguntaInsertada, error: preguntaError })
         if (preguntaError) throw preguntaError
 
-        console.log('✅ Pregunta creada, ID:', preguntaInsertada.id)
-
         // Crear opciones
-        console.log('🔧 Creando opciones...')
         for (let i = 0; i < formData.opciones.length; i++) {
           const opcion = formData.opciones[i]
           if (opcion.texto_opcion.trim()) {
@@ -277,7 +256,6 @@ const ProfesorGestionPreguntas = () => {
               .insert(opcionData)
 
             if (opcionError) throw opcionError
-            console.log(`✅ Opción ${i + 1} creada`)
           }
         }
       }
@@ -405,7 +383,6 @@ const ProfesorGestionPreguntas = () => {
 
     try {
       setUploadingImage(true)
-      console.log('🚀 Iniciando subida de imagen...')
 
       const result = await storageService.uploadImage(selectedFile)
       
@@ -415,7 +392,6 @@ const ProfesorGestionPreguntas = () => {
         if (fileInputRef.current) {
           fileInputRef.current.value = ''
         }
-        console.log('✅ Imagen subida y URL actualizada:', result.publicUrl)
       }
     } catch (error) {
       console.error('❌ Error subiendo imagen:', error)
@@ -456,9 +432,7 @@ const ProfesorGestionPreguntas = () => {
         if (bucketIndex !== -1 && bucketIndex + 1 < urlParts.length) {
           const filePath = urlParts.slice(bucketIndex + 1).join('/')
           
-          console.log('🗑️ Eliminando imagen del storage:', filePath)
           await storageService.deleteImage(filePath)
-          console.log('✅ Imagen eliminada del storage')
         } else {
           console.error('❌ No se pudo extraer la ruta del archivo de la URL:', formData.imagen_url)
         }
@@ -486,7 +460,6 @@ const ProfesorGestionPreguntas = () => {
 
   const handleEdit = async (pregunta) => {
     try {
-      console.log('✏️ ProfesorGestionPreguntas - Editando pregunta:', pregunta)
       
       // Mostrar loading dentro del SweetAlert
       Swal.fire({
@@ -510,7 +483,6 @@ const ProfesorGestionPreguntas = () => {
         nivel_dificultad: pregunta.nivel_dificultad,
         orden_mostrar: pregunta.orden_mostrar
       }))
-      console.log('📝 ProfesorGestionPreguntas - FormData actualizado con pregunta:', pregunta.pregunta)
 
       // Cargar opciones de la pregunta
       const { data: opcionesData, error } = await supabase
@@ -550,7 +522,6 @@ const ProfesorGestionPreguntas = () => {
         timerProgressBar: true
       })
       
-      console.log('✅ ProfesorGestionPreguntas - Formulario de edición abierto')
     } catch (error) {
       console.error('❌ ProfesorGestionPreguntas - Error cargando pregunta para editar:', error)
       Swal.fire({
@@ -610,7 +581,6 @@ const ProfesorGestionPreguntas = () => {
       setPreguntas(prev => prev.filter(p => p.id !== pregunta.id))
       setOpciones(prev => prev.filter(op => op.pregunta_id !== pregunta.id))
       
-      console.log('✅ Pregunta eliminada exitosamente')
       
       // Mostrar mensaje de éxito
       Swal.fire({
