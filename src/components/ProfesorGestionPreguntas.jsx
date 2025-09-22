@@ -305,7 +305,9 @@ const ProfesorGestionPreguntas = () => {
     setFormData({
       pregunta: '',
       imagen_url: '',
-      categoria: categoriaAsignada?.nombre || '',
+      categoria: categoriaAsignada 
+        ? (typeof categoriaAsignada === 'string' ? categoriaAsignada : categoriaAsignada.nombre)
+        : '',
       nivel_dificultad: 'Fácil',
       orden_mostrar: 0,
       opciones: [
@@ -834,7 +836,7 @@ const ProfesorGestionPreguntas = () => {
                     disabled
                   />
                   <p className="text-sm text-gray-500 mt-1">
-                    Solo puedes crear preguntas para tu categoría asignada: {categoriaAsignada.nombre}
+                    Solo puedes crear preguntas para tu categoría asignada: {typeof categoriaAsignada === 'string' ? categoriaAsignada : categoriaAsignada?.nombre}
                   </p>
                 </div>
 

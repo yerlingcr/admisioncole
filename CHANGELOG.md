@@ -25,6 +25,11 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 ### Corregido
 - Corrección del script de actualización de versión
 
+## [1.1.2] - 2025-09-22
+
+### Corregido
+- Corrección del bug de categoría en formulario de preguntas
+
 ## [1.0.0] - 2025-09-18
 
 ### Agregado
