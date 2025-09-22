@@ -74,7 +74,7 @@ function updateLoginComponent(newVersion) {
   
   // Actualizar la versión en el copyright
   content = content.replace(
-    /© 2025 Sistema de Admisión, ver\. \d+\.\d+/,
+    /© 2025 Sistema de Admisión, ver\. \d+\.\d+\.\d+/,
     `© 2025 Sistema de Admisión, ver. ${newVersion}`
   );
   

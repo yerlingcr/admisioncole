@@ -17,6 +17,7 @@ const ProfesorGestionEstudiantes = () => {
   const [editingEstudiante, setEditingEstudiante] = useState(null)
   const [categoriaAsignada, setCategoriaAsignada] = useState(null)
   const [filtroEstado, setFiltroEstado] = useState('todos') // 'todos', 'activos', 'inactivos'
+  const [busqueda, setBusqueda] = useState('')
   const [formData, setFormData] = useState({
     identificacion: '',
     nombre: '',
@@ -121,16 +122,29 @@ const ProfesorGestionEstudiantes = () => {
     }
   }
 
-  // Función para filtrar estudiantes por estado
+  // Función para filtrar estudiantes por estado y búsqueda
   const getEstudiantesFiltrados = () => {
-    if (filtroEstado === 'todos') {
-      return estudiantes
-    } else if (filtroEstado === 'activos') {
-      return estudiantes.filter(estudiante => estudiante.activo)
+    let estudiantesFiltrados = estudiantes
+
+    // Filtrar por estado
+    if (filtroEstado === 'activos') {
+      estudiantesFiltrados = estudiantesFiltrados.filter(estudiante => estudiante.activo)
     } else if (filtroEstado === 'inactivos') {
-      return estudiantes.filter(estudiante => !estudiante.activo)
+      estudiantesFiltrados = estudiantesFiltrados.filter(estudiante => !estudiante.activo)
     }
-    return estudiantes
+
+    // Filtrar por búsqueda (identificación, nombre, apellido o email)
+    if (busqueda.trim()) {
+      const terminoBusqueda = busqueda.toLowerCase().trim()
+      estudiantesFiltrados = estudiantesFiltrados.filter(estudiante => 
+        estudiante.identificacion.toLowerCase().includes(terminoBusqueda) ||
+        estudiante.nombre.toLowerCase().includes(terminoBusqueda) ||
+        estudiante.apellido.toLowerCase().includes(terminoBusqueda) ||
+        (estudiante.email && estudiante.email.toLowerCase().includes(terminoBusqueda))
+      )
+    }
+
+    return estudiantesFiltrados
   }
 
   const handleSubmit = async (e) => {
@@ -503,7 +517,7 @@ const ProfesorGestionEstudiantes = () => {
           
           {/* Filtro por estado */}
           <div className="flex items-center gap-4">
-            <label className="text-sm font-medium text-gray-700">Filtrar por:</label>
+            <label className="text-sm font-medium text-gray-700">Mostrar:</label>
             <select
               value={filtroEstado}
               onChange={(e) => setFiltroEstado(e.target.value)}
@@ -642,9 +656,22 @@ const ProfesorGestionEstudiantes = () => {
         {/* Lista de Estudiantes */}
         <div className="card bg-white border border-gray-300 shadow-lg">
           <div className="card-body">
-            <h2 className="card-title text-2xl text-gray-800 mb-6">
-              👥 Mis Estudiantes ({getEstudiantesFiltrados().length})
-            </h2>
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="card-title text-2xl text-gray-800">
+                👥 Mis Estudiantes ({getEstudiantesFiltrados().length})
+              </h2>
+              
+              {/* Cuadro de búsqueda */}
+              <div className="flex items-center gap-4">
+                <input
+                  type="text"
+                  placeholder="🔍 Buscar por identificación, nombre, apellido o email..."
+                  value={busqueda}
+                  onChange={(e) => setBusqueda(e.target.value)}
+                  className="input input-bordered input-sm bg-white border-gray-300 text-gray-800 w-80"
+                />
+              </div>
+            </div>
             
             {getEstudiantesFiltrados().length === 0 ? (
               <div className="text-center text-gray-500 py-8">
@@ -655,8 +682,18 @@ const ProfesorGestionEstudiantes = () => {
                   </>
                 ) : (
                   <>
-                    <p className="text-lg">No hay estudiantes que coincidan con el filtro seleccionado.</p>
-                    <p className="text-sm">Cambia el filtro o agrega un nuevo estudiante.</p>
+                    <p className="text-lg">
+                      {busqueda.trim() 
+                        ? `No se encontraron estudiantes que coincidan con "${busqueda}"` 
+                        : 'No hay estudiantes que coincidan con el filtro seleccionado.'
+                      }
+                    </p>
+                    <p className="text-sm">
+                      {busqueda.trim() 
+                        ? 'Intenta con otros términos de búsqueda o cambia el filtro.'
+                        : 'Cambia el filtro o agrega un nuevo estudiante.'
+                      }
+                    </p>
                   </>
                 )}
               </div>

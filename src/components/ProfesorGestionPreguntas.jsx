@@ -36,6 +36,7 @@ const ProfesorGestionPreguntas = () => {
   const [selectedFile, setSelectedFile] = useState(null)
   const [dragActive, setDragActive] = useState(false)
   const [filtroUsuario, setFiltroUsuario] = useState('todos') // 'todos', 'mis_preguntas', 'otros'
+  const [busqueda, setBusqueda] = useState('') // Para buscar preguntas por texto o ID
   const fileInputRef = useRef(null)
   const dropZoneRef = useRef(null)
 
@@ -122,16 +123,27 @@ const ProfesorGestionPreguntas = () => {
     }
   }
 
-  // Función para filtrar preguntas por usuario creador
+  // Función para filtrar preguntas por usuario creador y búsqueda
   const getPreguntasFiltradas = () => {
-    if (filtroUsuario === 'todos') {
-      return preguntas
-    } else if (filtroUsuario === 'mis_preguntas') {
-      return preguntas.filter(pregunta => pregunta.usuario_creador === userInfo?.identificacion)
+    let preguntasFiltradas = preguntas
+
+    // Filtrar por usuario creador
+    if (filtroUsuario === 'mis_preguntas') {
+      preguntasFiltradas = preguntasFiltradas.filter(pregunta => pregunta.usuario_creador === userInfo?.identificacion)
     } else if (filtroUsuario === 'otros') {
-      return preguntas.filter(pregunta => pregunta.usuario_creador !== userInfo?.identificacion)
+      preguntasFiltradas = preguntasFiltradas.filter(pregunta => pregunta.usuario_creador !== userInfo?.identificacion)
     }
-    return preguntas
+
+    // Filtrar por búsqueda (texto o ID)
+    if (busqueda.trim()) {
+      const busquedaLower = busqueda.toLowerCase().trim()
+      preguntasFiltradas = preguntasFiltradas.filter(pregunta => 
+        pregunta.pregunta.toLowerCase().includes(busquedaLower) ||
+        pregunta.id.toString().includes(busquedaLower)
+      )
+    }
+
+    return preguntasFiltradas
   }
 
   const handleOpcionChange = (index, field, value) => {
@@ -260,27 +272,9 @@ const ProfesorGestionPreguntas = () => {
         }
       }
 
-      // Actualizar la lista localmente sin recargar toda la página
-      if (editingPregunta) {
-        // Actualizar pregunta existente en la lista
-        setPreguntas(prev => prev.map(p => 
-          p.id === editingPregunta.id 
-            ? { ...p, pregunta: formData.pregunta, imagen_url: formData.imagen_url, nivel_dificultad: formData.nivel_dificultad }
-            : p
-        ))
-      } else {
-        // Agregar nueva pregunta a la lista
-        const nuevaPregunta = {
-          id: Date.now(), // ID temporal para la UI
-          pregunta: formData.pregunta,
-          imagen_url: formData.imagen_url,
-          categoria: formData.categoria,
-          nivel_dificultad: formData.nivel_dificultad,
-          usuario_creador: userInfo.identificacion,
-          fecha_creacion: new Date().toISOString()
-        }
-        setPreguntas(prev => [...prev, nuevaPregunta])
-      }
+      // Recargar las preguntas desde la base de datos para asegurar consistencia
+      console.log('🔄 Recargando preguntas desde la base de datos...')
+      await loadPreguntas(formData.categoria)
       
       // Limpiar formulario
       resetForm()
@@ -460,6 +454,12 @@ const ProfesorGestionPreguntas = () => {
 
   const handleEdit = async (pregunta) => {
     try {
+      console.log('🔍 Editando pregunta:', pregunta)
+      
+      // Validar que la pregunta tenga los datos necesarios
+      if (!pregunta || !pregunta.id) {
+        throw new Error('Pregunta no válida o sin ID')
+      }
       
       // Mostrar loading dentro del SweetAlert
       Swal.fire({
@@ -477,21 +477,27 @@ const ProfesorGestionPreguntas = () => {
       setEditingPregunta(pregunta)
       setFormData(prev => ({
         ...prev,
-        pregunta: pregunta.pregunta,
+        pregunta: pregunta.pregunta || '',
         imagen_url: pregunta.imagen_url || '',
-        categoria: pregunta.categoria,
-        nivel_dificultad: pregunta.nivel_dificultad,
-        orden_mostrar: pregunta.orden_mostrar
+        categoria: pregunta.categoria || '',
+        nivel_dificultad: pregunta.nivel_dificultad || 'Fácil',
+        orden_mostrar: pregunta.orden_mostrar || 0
       }))
 
       // Cargar opciones de la pregunta
+      console.log('📋 Cargando opciones para pregunta ID:', pregunta.id)
       const { data: opcionesData, error } = await supabase
         .from('opciones_respuesta')
         .select('*')
         .eq('pregunta_id', pregunta.id)
         .order('orden_mostrar')
 
-      if (error) throw error
+      if (error) {
+        console.error('❌ Error cargando opciones:', error)
+        throw error
+      }
+
+      console.log('✅ Opciones cargadas:', opcionesData)
 
       const opcionesFormateadas = [
         { texto_opcion: '', es_correcta: false },
@@ -500,15 +506,19 @@ const ProfesorGestionPreguntas = () => {
         { texto_opcion: '', es_correcta: false }
       ]
 
-      opcionesData.forEach((opcion, index) => {
-        if (index < 4) {
-          opcionesFormateadas[index] = {
-            texto_opcion: opcion.texto_opcion,
-            es_correcta: opcion.es_correcta
+      // Llenar las opciones con los datos de la base de datos
+      if (opcionesData && opcionesData.length > 0) {
+        opcionesData.forEach((opcion, index) => {
+          if (index < 4) {
+            opcionesFormateadas[index] = {
+              texto_opcion: opcion.texto_opcion || '',
+              es_correcta: opcion.es_correcta || false
+            }
           }
-        }
-      })
+        })
+      }
 
+      console.log('📝 Opciones formateadas:', opcionesFormateadas)
       setFormData(prev => ({ ...prev, opciones: opcionesFormateadas }))
       setShowForm(true)
       
@@ -527,7 +537,7 @@ const ProfesorGestionPreguntas = () => {
       Swal.fire({
         icon: 'error',
         title: 'Error',
-        text: 'Error al cargar la pregunta para editar',
+        text: `Error al cargar la pregunta para editar: ${error.message || 'Error desconocido'}`,
         confirmButtonColor: '#d33'
       })
     }
@@ -577,10 +587,9 @@ const ProfesorGestionPreguntas = () => {
 
       if (preguntaError) throw preguntaError
 
-      // Actualizar la lista localmente sin recargar toda la página
-      setPreguntas(prev => prev.filter(p => p.id !== pregunta.id))
-      setOpciones(prev => prev.filter(op => op.pregunta_id !== pregunta.id))
-      
+      // Recargar las preguntas desde la base de datos para asegurar consistencia
+      console.log('🔄 Recargando preguntas después de eliminar...')
+      await loadPreguntas(pregunta.categoria)
       
       // Mostrar mensaje de éxito
       Swal.fire({
@@ -648,7 +657,7 @@ const ProfesorGestionPreguntas = () => {
           
           {/* Filtro por usuario creador */}
           <div className="flex items-center gap-4">
-            <label className="text-sm font-medium text-gray-700">Filtrar por:</label>
+            <label className="text-sm font-medium text-gray-700">Mostrar:</label>
             <select
               value={filtroUsuario}
               onChange={(e) => setFiltroUsuario(e.target.value)}
@@ -905,9 +914,22 @@ const ProfesorGestionPreguntas = () => {
         {/* Lista de Preguntas */}
         <div className="card bg-white border border-gray-300 shadow-lg">
           <div className="card-body">
-            <h2 className="card-title text-2xl text-gray-800 mb-6">
-              📋 Mis Preguntas ({getPreguntasFiltradas().length})
-            </h2>
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+              <h2 className="card-title text-2xl text-gray-800">
+                📋 Mis Preguntas ({getPreguntasFiltradas().length})
+              </h2>
+              
+              {/* Campo de Búsqueda */}
+              <div className="form-control">
+                <input
+                  type="text"
+                  placeholder="🔍 Buscar por texto o ID..."
+                  value={busqueda}
+                  onChange={(e) => setBusqueda(e.target.value)}
+                  className="input input-bordered w-full max-w-xs bg-white border-gray-300 text-gray-800"
+                />
+              </div>
+            </div>
             
             {getPreguntasFiltradas().length === 0 ? (
               <div className="text-center text-gray-500 py-8">
@@ -933,7 +955,12 @@ const ProfesorGestionPreguntas = () => {
                     <div key={pregunta.id} className="bg-gray-50 rounded-xl p-4 border border-gray-200">
                       <div className="flex justify-between items-start mb-3">
                         <div className="flex-1">
-                          <h3 className="font-semibold text-gray-800 text-lg mb-2">{pregunta.pregunta}</h3>
+                          <div className="flex items-center gap-3 mb-2">
+                            <span className="text-gray-600 font-mono text-sm">
+                              ID: {pregunta.id}
+                            </span>
+                            <h3 className="font-semibold text-gray-800 text-lg">{pregunta.pregunta}</h3>
+                          </div>
                           
                           {/* Imagen de la pregunta */}
                           {pregunta.imagen_url && (

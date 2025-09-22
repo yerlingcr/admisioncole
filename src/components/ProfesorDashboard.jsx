@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabaseConfig'
 import LoadingSpinner from './LoadingSpinner'
 import ThemeToggle from './ThemeToggle'
 import usuarioCategoriasService from '../services/usuarioCategoriasService'
+import OptimizedStatsService from '../services/optimizedStatsService'
 import Swal from 'sweetalert2'
 import jsPDF from 'jspdf'
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend } from 'chart.js'
@@ -34,6 +35,8 @@ const ProfesorDashboard = () => {
   const [detallesPrueba, setDetallesPrueba] = useState(null)
   const [loadingDetalles, setLoadingDetalles] = useState(false)
   const [topEstudiantesData, setTopEstudiantesData] = useState(null)
+  const [preguntasFallidasData, setPreguntasFallidasData] = useState(null)
+  const [preguntasAcertadasData, setPreguntasAcertadasData] = useState(null)
   const [mostrarNotas, setMostrarNotas] = useState(false)
   const [mostrarGraficos, setMostrarGraficos] = useState(false)
   const [seccionActiva, setSeccionActiva] = useState('dashboard')
@@ -47,8 +50,21 @@ const ProfesorDashboard = () => {
       loadEstadisticas(categoriaAsignada)
       loadNotasEstudiantes()
       loadTopEstudiantes()
+      loadPreguntasFallidas()
+      loadPreguntasAcertadas()
     }
   }, [categoriaAsignada, userInfo])
+
+  // Refrescar estadísticas cuando se regresa al dashboard
+  useEffect(() => {
+    if (categoriaAsignada && userInfo && seccionActiva === 'dashboard') {
+      console.log('🔄 Refrescando estadísticas del dashboard...')
+      loadEstadisticas(categoriaAsignada)
+      loadTopEstudiantes()
+      loadPreguntasFallidas()
+      loadPreguntasAcertadas()
+    }
+  }, [seccionActiva, categoriaAsignada, userInfo])
 
   const loadUserInfo = async () => {
     try {
@@ -76,20 +92,41 @@ const ProfesorDashboard = () => {
 
   const loadCategoriaAsignada = async (identificacion) => {
     try {
+      console.log('🚀 Cargando datos del profesor...')
+      
+      try {
+        // Intentar usar el servicio optimizado primero
+        const professorData = await OptimizedStatsService.getProfessorData(identificacion)
+        
+        if (professorData?.categoria_asignada) {
+          setCategoriaAsignada(professorData.categoria_asignada)
+          setEstadisticas({
+            totalPreguntas: professorData.total_preguntas_categoria || 0,
+            preguntasCreadas: 0,
+            totalEstudiantes: professorData.total_estudiantes || 0,
+            estudiantesActivos: professorData.estudiantes_activos || 0,
+            totalIntentos: professorData.intentos_categoria || 0
+          })
+          console.log('✅ Datos del profesor cargados con RPC:', professorData)
+          return
+        }
+      } catch (rpcError) {
+        // Usando método original (RPC no disponible)
+      }
+      
+      // Fallback al método original
       const categorias = await usuarioCategoriasService.getCategoriasByUsuario(identificacion)
       
       if (categorias && categorias.length > 0 && categorias[0]) {
-        setCategoriaAsignada(categorias[0])
-        
-        // La categoría puede venir como string o como objeto
         const nombreCategoria = typeof categorias[0] === 'string' ? categorias[0] : categorias[0].nombre
         
         if (nombreCategoria) {
           setCategoriaAsignada(nombreCategoria)
+          // Categoría cargada exitosamente
         }
       }
     } catch (error) {
-      console.error('Error cargando categoría asignada:', error)
+      console.error('Error cargando datos del profesor:', error)
     }
   }
 
@@ -528,6 +565,35 @@ const ProfesorDashboard = () => {
     if (!categoriaAsignada) return
     
     try {
+      console.log('🚀 Cargando top estudiantes...')
+      
+      try {
+        // Intentar usar el servicio optimizado primero
+        const topStudents = await OptimizedStatsService.getTopStudents(categoriaAsignada, 10)
+        
+        if (topStudents && topStudents.length > 0) {
+          // Procesar datos para el formato esperado por el gráfico
+          const estudiantesConMejoresNotas = topStudents.map(estudiante => ({
+            identificacion: estudiante.estudiante_id,
+            nombre: estudiante.nombre_completo.split(' ')[0] || '',
+            apellidos: estudiante.nombre_completo.split(' ').slice(1).join(' ') || '',
+            notaObtenida: estudiante.puntuacion_total || 0,
+            fechaIntento: estudiante.fecha_fin || null
+          }))
+          
+          console.log('✅ Top estudiantes cargados con RPC:', estudiantesConMejoresNotas.length)
+          
+          // Continuar con el procesamiento normal
+          processTopStudentsData(estudiantesConMejoresNotas)
+          return
+        }
+      } catch (rpcError) {
+        // Usando método original (RPC no disponible)
+      }
+      
+      // Fallback al método original
+        // Usando método original para top estudiantes
+      
       // Obtener estudiantes de la categoría del profesor
       const { data: estudiantesCategoria, error: errorEstudiantes } = await supabase
         .from('usuario_categorias')
@@ -585,7 +651,21 @@ const ProfesorDashboard = () => {
           fechaIntento: mejorIntento.fecha_fin || null
         }
       })
+      
+      // Top estudiantes cargados exitosamente
+      
+      // Procesar los datos
+      processTopStudentsData(estudiantesConMejoresNotas)
+      
+    } catch (error) {
+      console.error('❌ Error cargando top estudiantes:', error)
+      setTopEstudiantesData(null)
+    }
+  }
 
+  // Función helper para procesar los datos de top estudiantes
+  const processTopStudentsData = (estudiantesConMejoresNotas) => {
+    try {
       // Filtrar estudiantes con notas > 0 y ordenar por nota descendente
       const estudiantesConNotas = estudiantesConMejoresNotas
         .filter(estudiante => estudiante.notaObtenida > 0)
@@ -635,10 +715,299 @@ const ProfesorDashboard = () => {
       } else {
         setTopEstudiantesData(null)
       }
+    } catch (error) {
+      console.error('❌ Error procesando datos de top estudiantes:', error)
+      setTopEstudiantesData(null)
+    }
+  }
+
+  // Función para cargar las 3 preguntas que más fallaron
+  const loadPreguntasFallidas = async () => {
+    if (!categoriaAsignada) return
+    
+    try {
+      console.log('🚀 Cargando preguntas que más fallaron...')
+      
+      // Intentar primero con consulta optimizada
+      try {
+        const { data: respuestasIncorrectas, error } = await supabase
+          .from('respuestas_estudiante')
+          .select(`
+            pregunta_id,
+            intento_id,
+            preguntas_quiz!inner(
+              id,
+              pregunta,
+              categoria
+            )
+          `)
+          .eq('preguntas_quiz.categoria', categoriaAsignada)
+          .eq('es_correcta', false)
+
+        if (error) {
+          // Silenciar error de RPC no disponible para usuarios finales
+          throw error
+        }
+
+        await processPreguntasFallidas(respuestasIncorrectas)
+        return
+
+      } catch (optimizedError) {
+        // Usando método original para preguntas fallidas
+        
+        // Método original con consultas separadas
+        const { data: preguntas, error: preguntasError } = await supabase
+          .from('preguntas_quiz')
+          .select('id, pregunta, categoria')
+          .eq('categoria', categoriaAsignada)
+
+        if (preguntasError) {
+          console.error('❌ Error cargando preguntas:', preguntasError)
+          setPreguntasFallidasData(null)
+          return
+        }
+
+        const { data: respuestas, error: respuestasError } = await supabase
+          .from('respuestas_estudiante')
+          .select('pregunta_id, es_correcta, intento_id')
+          .eq('es_correcta', false)
+          .in('pregunta_id', preguntas.map(p => p.id))
+
+        if (respuestasError) {
+          console.error('❌ Error cargando respuestas:', respuestasError)
+          setPreguntasFallidasData(null)
+          return
+        }
+
+        // Obtener opciones para cada pregunta
+        const preguntasConOpciones = await Promise.all(
+          preguntas.map(async (pregunta) => {
+            const { data: opciones } = await supabase
+              .from('opciones_quiz')
+              .select('id, opcion_texto, es_correcta')
+              .eq('pregunta_id', pregunta.id)
+            
+            return {
+              ...pregunta,
+              opciones_quiz: opciones || []
+            }
+          })
+        )
+
+        // Procesar respuestas con datos de preguntas
+        const respuestasConPreguntas = respuestas.map(respuesta => ({
+          pregunta_id: respuesta.pregunta_id,
+          es_correcta: respuesta.es_correcta,
+          preguntas_quiz: preguntasConOpciones.find(p => p.id === respuesta.pregunta_id)
+        }))
+
+        await processPreguntasFallidas(respuestasConPreguntas)
+      }
 
     } catch (error) {
-      console.error('❌ Error cargando top estudiantes:', error)
-      setTopEstudiantesData(null)
+      console.error('❌ Error cargando preguntas fallidas:', error)
+      setPreguntasFallidasData(null)
+    }
+  }
+
+  // Función helper para procesar preguntas fallidas
+  const processPreguntasFallidas = async (respuestasIncorrectas) => {
+    try {
+      // Contar estudiantes únicos que fallaron cada pregunta
+      const conteoFallidas = {}
+      respuestasIncorrectas?.forEach(respuesta => {
+        const preguntaId = respuesta.pregunta_id
+        if (!conteoFallidas[preguntaId]) {
+          conteoFallidas[preguntaId] = {
+            id: preguntaId,
+            pregunta: respuesta.preguntas_quiz.pregunta,
+            opciones: respuesta.preguntas_quiz.opciones_quiz || [],
+            estudiantesFallidos: new Set() // Usar Set para intentos únicos
+          }
+        }
+        // Agregar el intento único que falló (usando intento_id como identificador único)
+        conteoFallidas[preguntaId].estudiantesFallidos.add(respuesta.intento_id)
+      })
+
+      // Convertir Sets a números para el gráfico
+      Object.keys(conteoFallidas).forEach(preguntaId => {
+        conteoFallidas[preguntaId].fallos = conteoFallidas[preguntaId].estudiantesFallidos.size
+      })
+
+      // Obtener las 3 preguntas que más fallaron
+      const top3Fallidas = Object.values(conteoFallidas)
+        .sort((a, b) => b.fallos - a.fallos)
+        .slice(0, 3)
+
+      if (top3Fallidas.length > 0) {
+        const chartData = {
+          labels: top3Fallidas.map(p => `ID: ${p.id}`),
+          datasets: [
+            {
+              label: 'Intentos que Fallaron',
+              data: top3Fallidas.map(p => p.fallos),
+              backgroundColor: ['#ef4444', '#f97316', '#eab308'],
+              borderColor: ['#dc2626', '#ea580c', '#ca8a04'],
+              borderWidth: 2,
+              // Agregar datos completos para tooltips
+              fullData: top3Fallidas
+            }
+          ]
+        }
+        setPreguntasFallidasData(chartData)
+        // Preguntas fallidas cargadas exitosamente
+      } else {
+        setPreguntasFallidasData(null)
+        console.log('ℹ️ No hay datos de preguntas fallidas para mostrar')
+      }
+    } catch (error) {
+      console.error('❌ Error procesando preguntas fallidas:', error)
+      setPreguntasFallidasData(null)
+    }
+  }
+
+  // Función para cargar las 3 preguntas que más acertaron
+  const loadPreguntasAcertadas = async () => {
+    if (!categoriaAsignada) return
+    
+    try {
+      console.log('🚀 Cargando preguntas que más acertaron...')
+      
+      // Intentar primero con consulta optimizada
+      try {
+        const { data: respuestasCorrectas, error } = await supabase
+          .from('respuestas_estudiante')
+          .select(`
+            pregunta_id,
+            intento_id,
+            preguntas_quiz!inner(
+              id,
+              pregunta,
+              categoria
+            )
+          `)
+          .eq('preguntas_quiz.categoria', categoriaAsignada)
+          .eq('es_correcta', true)
+
+        if (error) {
+          // Silenciar error de RPC no disponible para usuarios finales
+          throw error
+        }
+
+        await processPreguntasAcertadas(respuestasCorrectas)
+        return
+
+      } catch (optimizedError) {
+        // Usando método original para preguntas acertadas
+        
+        // Método original con consultas separadas
+        const { data: preguntas, error: preguntasError } = await supabase
+          .from('preguntas_quiz')
+          .select('id, pregunta, categoria')
+          .eq('categoria', categoriaAsignada)
+
+        if (preguntasError) {
+          console.error('❌ Error cargando preguntas:', preguntasError)
+          setPreguntasAcertadasData(null)
+          return
+        }
+
+        const { data: respuestas, error: respuestasError } = await supabase
+          .from('respuestas_estudiante')
+          .select('pregunta_id, es_correcta, intento_id')
+          .eq('es_correcta', true)
+          .in('pregunta_id', preguntas.map(p => p.id))
+
+        if (respuestasError) {
+          console.error('❌ Error cargando respuestas:', respuestasError)
+          setPreguntasAcertadasData(null)
+          return
+        }
+
+        // Obtener opciones para cada pregunta
+        const preguntasConOpciones = await Promise.all(
+          preguntas.map(async (pregunta) => {
+            const { data: opciones } = await supabase
+              .from('opciones_quiz')
+              .select('id, opcion_texto, es_correcta')
+              .eq('pregunta_id', pregunta.id)
+            
+            return {
+              ...pregunta,
+              opciones_quiz: opciones || []
+            }
+          })
+        )
+
+        // Procesar respuestas con datos de preguntas
+        const respuestasConPreguntas = respuestas.map(respuesta => ({
+          pregunta_id: respuesta.pregunta_id,
+          es_correcta: respuesta.es_correcta,
+          preguntas_quiz: preguntasConOpciones.find(p => p.id === respuesta.pregunta_id)
+        }))
+
+        await processPreguntasAcertadas(respuestasConPreguntas)
+      }
+
+    } catch (error) {
+      console.error('❌ Error cargando preguntas acertadas:', error)
+      setPreguntasAcertadasData(null)
+    }
+  }
+
+  // Función helper para procesar preguntas acertadas
+  const processPreguntasAcertadas = async (respuestasCorrectas) => {
+    try {
+      // Contar estudiantes únicos que acertaron cada pregunta
+      const conteoAcertadas = {}
+      respuestasCorrectas?.forEach(respuesta => {
+        const preguntaId = respuesta.pregunta_id
+        if (!conteoAcertadas[preguntaId]) {
+          conteoAcertadas[preguntaId] = {
+            id: preguntaId,
+            pregunta: respuesta.preguntas_quiz.pregunta,
+            opciones: respuesta.preguntas_quiz.opciones_quiz || [],
+            estudiantesAcertados: new Set() // Usar Set para intentos únicos
+          }
+        }
+        // Agregar el intento único que acertó (usando intento_id como identificador único)
+        conteoAcertadas[preguntaId].estudiantesAcertados.add(respuesta.intento_id)
+      })
+
+      // Convertir Sets a números para el gráfico
+      Object.keys(conteoAcertadas).forEach(preguntaId => {
+        conteoAcertadas[preguntaId].aciertos = conteoAcertadas[preguntaId].estudiantesAcertados.size
+      })
+
+      // Obtener las 3 preguntas que más acertaron
+      const top3Acertadas = Object.values(conteoAcertadas)
+        .sort((a, b) => b.aciertos - a.aciertos)
+        .slice(0, 3)
+
+      if (top3Acertadas.length > 0) {
+        const chartData = {
+          labels: top3Acertadas.map(p => `ID: ${p.id}`),
+          datasets: [
+            {
+              label: 'Intentos que Acertaron',
+              data: top3Acertadas.map(p => p.aciertos),
+              backgroundColor: ['#10b981', '#06b6d4', '#8b5cf6'],
+              borderColor: ['#059669', '#0891b2', '#7c3aed'],
+              borderWidth: 2,
+              // Agregar datos completos para tooltips
+              fullData: top3Acertadas
+            }
+          ]
+        }
+        setPreguntasAcertadasData(chartData)
+        // Preguntas acertadas cargadas exitosamente
+      } else {
+        setPreguntasAcertadasData(null)
+        console.log('ℹ️ No hay datos de preguntas acertadas para mostrar')
+      }
+    } catch (error) {
+      console.error('❌ Error procesando preguntas acertadas:', error)
+      setPreguntasAcertadasData(null)
     }
   }
 
@@ -1676,6 +2045,560 @@ const ProfesorDashboard = () => {
                 <div className="mt-4 text-center">
                   <p className="text-sm text-gray-600">
                     Gráfico que muestra los 10 estudiantes con las mejores notas de la categoría
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Gráfico de Preguntas que Más Fallaron */}
+        {categoriaAsignada && preguntasFallidasData && seccionActiva === 'graficos' && (
+          <div className="mt-8 chart-print-container">
+            <div className="card bg-white border border-gray-300 shadow-lg">
+              <div className="card-body">
+                <div className="flex justify-between items-center mb-6">
+                  <h2 className="card-title text-xl text-gray-800">
+                    ❌ Top 3 Preguntas que Más Fallaron
+                  </h2>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={loadPreguntasFallidas}
+                      className="btn btn-sm btn-outline"
+                    >
+                      🔄 Actualizar
+                    </button>
+                    <button
+                      onClick={async () => {
+                        try {
+                          // Obtener el canvas del gráfico
+                          const chartCanvas = document.querySelector('.chart-fallidas-container canvas')
+                          
+                          if (!chartCanvas) {
+                            Swal.fire({
+                              icon: 'error',
+                              title: 'Error',
+                              text: 'No se pudo encontrar el gráfico para imprimir',
+                              confirmButtonColor: '#dc3545'
+                            })
+                            return
+                          }
+                          
+                          // Convertir canvas a imagen
+                          const chartImage = chartCanvas.toDataURL('image/png')
+                          
+                          // Crear ventana de impresión
+                          const printWindow = window.open('', '_blank')
+                          printWindow.document.write(`
+                            <html>
+                              <head>
+                                <title>Top 3 Preguntas que Más Fallaron</title>
+                                <style>
+                                  body {
+                                    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                                    margin: 0;
+                                    padding: 20px;
+                                    background-color: #f8f9fa;
+                                  }
+                                  .print-container {
+                                    background: white;
+                                    padding: 30px;
+                                    border-radius: 10px;
+                                    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+                                    max-width: 800px;
+                                    margin: 0 auto;
+                                  }
+                                  .header {
+                                    text-align: center;
+                                    margin-bottom: 30px;
+                                    border-bottom: 3px solid #ef4444;
+                                    padding-bottom: 20px;
+                                  }
+                                  .card-title {
+                                    color: #ef4444;
+                                    font-size: 2rem;
+                                    margin: 0;
+                                    font-weight: bold;
+                                  }
+                                  .info-section {
+                                    display: flex;
+                                    justify-content: space-between;
+                                    margin-bottom: 30px;
+                                    font-size: 1.1rem;
+                                  }
+                                  .info-item {
+                                    flex: 1;
+                                    text-align: center;
+                                  }
+                                  .chart-container {
+                                    text-align: center;
+                                    margin: 20px 0;
+                                  }
+                                  .chart-image {
+                                    max-width: 100%;
+                                    height: auto;
+                                    border: 1px solid #ddd;
+                                    border-radius: 8px;
+                                    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+                                  }
+                                  .footer {
+                                    text-align: center;
+                                    color: #666;
+                                    margin-top: 30px;
+                                    font-size: 0.9rem;
+                                    border-top: 1px solid #eee;
+                                    padding-top: 20px;
+                                  }
+                                  @media print {
+                                    body { margin: 0; padding: 15px; }
+                                    .print-container { box-shadow: none; border: 2px solid #000; }
+                                    .card-title { font-size: 1.8rem; }
+                                  }
+                                </style>
+                              </head>
+                              <body>
+                                <div class="print-container">
+                                  <div class="header">
+                                    <h1 class="card-title">❌ Top 3 Preguntas que Más Fallaron</h1>
+                                  </div>
+                                  
+                                  <div class="info-section">
+                                    <div class="info-item">
+                                      <strong>Categoría:</strong><br>
+                                      ${typeof categoriaAsignada === 'string' ? categoriaAsignada : categoriaAsignada.nombre}
+                                    </div>
+                                    <div class="info-item">
+                                      <strong>Fecha de impresión:</strong><br>
+                                      ${new Date().toLocaleDateString('es-CR')}
+                                    </div>
+                                    <div class="info-item">
+                                      <strong>Preguntas:</strong><br>
+                                      ${preguntasFallidasData.labels.length} registros
+                                    </div>
+                                  </div>
+                                  
+                                  <div class="chart-container">
+                                    <img src="${chartImage}" alt="Gráfico Top 3 Preguntas Fallidas" class="chart-image" />
+                                  </div>
+                                  
+                                  <div class="footer">
+                                    <p><strong>Sistema de Admisión 2025</strong></p>
+                                    <p>Este documento muestra las 3 preguntas con más respuestas incorrectas de la categoría asignada al profesor.</p>
+                                  </div>
+                                </div>
+                              </body>
+                            </html>
+                          `)
+                          
+                          printWindow.document.close()
+                          printWindow.focus()
+                          
+                          // Esperar a que se cargue la imagen antes de imprimir
+                          setTimeout(() => {
+                            printWindow.print()
+                            printWindow.close()
+                          }, 1000)
+                          
+                        } catch (error) {
+                          console.error('Error al imprimir:', error)
+                          Swal.fire({
+                            icon: 'error',
+                            title: 'Error',
+                            text: 'Ocurrió un error al generar la impresión',
+                            confirmButtonColor: '#dc3545'
+                          })
+                        }
+                      }}
+                      className="btn btn-sm btn-primary"
+                    >
+                      🖨️ Imprimir
+                    </button>
+                  </div>
+                </div>
+                
+                <div className="h-96 chart-fallidas-container">
+                  <Bar
+                    data={preguntasFallidasData}
+                    options={{
+                      responsive: true,
+                      maintainAspectRatio: false,
+                      plugins: {
+                        title: {
+                          display: true,
+                          text: `Top 3 Preguntas que Más Fallaron - ${typeof categoriaAsignada === 'string' ? categoriaAsignada : categoriaAsignada.nombre}`,
+                          font: {
+                            size: 16,
+                            weight: 'bold'
+                          },
+                          color: '#4d3930'
+                        },
+                        legend: {
+                          display: false
+                        },
+                        tooltip: {
+                          titleFont: { size: 14, weight: 'bold' },
+                          bodyFont: { size: 12 },
+                          padding: 12,
+                          backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                          titleColor: '#ffffff',
+                          bodyColor: '#ffffff',
+                          borderColor: '#ef4444',
+                          borderWidth: 2,
+                          cornerRadius: 8,
+                          displayColors: false,
+                          callbacks: {
+                            title: function(context) {
+                              if (!context || !context[0] || !context[0].dataset || !context[0].dataset.fullData) {
+                                return '❌ Pregunta'
+                              }
+                              const preguntaData = context[0].dataset.fullData[context[0].dataIndex]
+                              return `❌ Pregunta ID: ${preguntaData.id}`
+                            },
+                            label: function(context) {
+                              if (!context || !context[0] || !context[0].dataset || !context[0].dataset.fullData) {
+                                return [`🔴 Fallos: ${context?.parsed?.y || 0}`]
+                              }
+                              const preguntaData = context[0].dataset.fullData[context[0].dataIndex]
+                              return [
+                                `📝 ${preguntaData.pregunta}`,
+                                '',
+                                `🔴 Intentos que fallaron: ${context.parsed.y}`,
+                                '',
+                                '📋 Opciones:'
+                              ]
+                            },
+                            afterBody: function(context) {
+                              if (!context || !context[0] || !context[0].dataset || !context[0].dataset.fullData) {
+                                return []
+                              }
+                              const preguntaData = context[0].dataset.fullData[context[0].dataIndex]
+                              const opciones = preguntaData.opciones || []
+                              const opcionesTexto = opciones.map((op, index) => {
+                                const correcta = op.es_correcta ? '✅' : '❌'
+                                return `  ${String.fromCharCode(65 + index)}) ${correcta} ${op.opcion_texto}`
+                              })
+                              return opcionesTexto
+                            }
+                          }
+                        }
+                      },
+                      scales: {
+                        y: {
+                          beginAtZero: true,
+                          title: {
+                            display: true,
+                            text: 'Intentos que Fallaron',
+                            font: {
+                              weight: 'bold'
+                            },
+                            color: '#4d3930'
+                          },
+                          grid: {
+                            color: 'rgba(0,0,0,0.1)'
+                          }
+                        },
+                        x: {
+                          title: {
+                            display: true,
+                            text: 'Preguntas',
+                            font: {
+                              weight: 'bold'
+                            },
+                            color: '#4d3930'
+                          },
+                          ticks: {
+                            maxRotation: 45,
+                            minRotation: 45,
+                            font: {
+                              size: 10
+                            }
+                          }
+                        }
+                      }
+                    }}
+                  />
+                </div>
+                
+                <div className="mt-4 text-center">
+                  <p className="text-sm text-gray-600">
+                    Gráfico que muestra las 3 preguntas con más respuestas incorrectas
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Gráfico de Preguntas que Más Acertaron */}
+        {categoriaAsignada && preguntasAcertadasData && seccionActiva === 'graficos' && (
+          <div className="mt-8 chart-print-container">
+            <div className="card bg-white border border-gray-300 shadow-lg">
+              <div className="card-body">
+                <div className="flex justify-between items-center mb-6">
+                  <h2 className="card-title text-xl text-gray-800">
+                    ✅ Top 3 Preguntas que Más Acertaron
+                  </h2>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={loadPreguntasAcertadas}
+                      className="btn btn-sm btn-outline"
+                    >
+                      🔄 Actualizar
+                    </button>
+                    <button
+                      onClick={async () => {
+                        try {
+                          // Obtener el canvas del gráfico
+                          const chartCanvas = document.querySelector('.chart-acertadas-container canvas')
+                          
+                          if (!chartCanvas) {
+                            Swal.fire({
+                              icon: 'error',
+                              title: 'Error',
+                              text: 'No se pudo encontrar el gráfico para imprimir',
+                              confirmButtonColor: '#dc3545'
+                            })
+                            return
+                          }
+                          
+                          // Convertir canvas a imagen
+                          const chartImage = chartCanvas.toDataURL('image/png')
+                          
+                          // Crear ventana de impresión
+                          const printWindow = window.open('', '_blank')
+                          printWindow.document.write(`
+                            <html>
+                              <head>
+                                <title>Top 3 Preguntas que Más Acertaron</title>
+                                <style>
+                                  body {
+                                    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                                    margin: 0;
+                                    padding: 20px;
+                                    background-color: #f8f9fa;
+                                  }
+                                  .print-container {
+                                    background: white;
+                                    padding: 30px;
+                                    border-radius: 10px;
+                                    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+                                    max-width: 800px;
+                                    margin: 0 auto;
+                                  }
+                                  .header {
+                                    text-align: center;
+                                    margin-bottom: 30px;
+                                    border-bottom: 3px solid #10b981;
+                                    padding-bottom: 20px;
+                                  }
+                                  .card-title {
+                                    color: #10b981;
+                                    font-size: 2rem;
+                                    margin: 0;
+                                    font-weight: bold;
+                                  }
+                                  .info-section {
+                                    display: flex;
+                                    justify-content: space-between;
+                                    margin-bottom: 30px;
+                                    font-size: 1.1rem;
+                                  }
+                                  .info-item {
+                                    flex: 1;
+                                    text-align: center;
+                                  }
+                                  .chart-container {
+                                    text-align: center;
+                                    margin: 20px 0;
+                                  }
+                                  .chart-image {
+                                    max-width: 100%;
+                                    height: auto;
+                                    border: 1px solid #ddd;
+                                    border-radius: 8px;
+                                    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+                                  }
+                                  .footer {
+                                    text-align: center;
+                                    color: #666;
+                                    margin-top: 30px;
+                                    font-size: 0.9rem;
+                                    border-top: 1px solid #eee;
+                                    padding-top: 20px;
+                                  }
+                                  @media print {
+                                    body { margin: 0; padding: 15px; }
+                                    .print-container { box-shadow: none; border: 2px solid #000; }
+                                    .card-title { font-size: 1.8rem; }
+                                  }
+                                </style>
+                              </head>
+                              <body>
+                                <div class="print-container">
+                                  <div class="header">
+                                    <h1 class="card-title">✅ Top 3 Preguntas que Más Acertaron</h1>
+                                  </div>
+                                  
+                                  <div class="info-section">
+                                    <div class="info-item">
+                                      <strong>Categoría:</strong><br>
+                                      ${typeof categoriaAsignada === 'string' ? categoriaAsignada : categoriaAsignada.nombre}
+                                    </div>
+                                    <div class="info-item">
+                                      <strong>Fecha de impresión:</strong><br>
+                                      ${new Date().toLocaleDateString('es-CR')}
+                                    </div>
+                                    <div class="info-item">
+                                      <strong>Preguntas:</strong><br>
+                                      ${preguntasAcertadasData.labels.length} registros
+                                    </div>
+                                  </div>
+                                  
+                                  <div class="chart-container">
+                                    <img src="${chartImage}" alt="Gráfico Top 3 Preguntas Acertadas" class="chart-image" />
+                                  </div>
+                                  
+                                  <div class="footer">
+                                    <p><strong>Sistema de Admisión 2025</strong></p>
+                                    <p>Este documento muestra las 3 preguntas con más respuestas correctas de la categoría asignada al profesor.</p>
+                                  </div>
+                                </div>
+                              </body>
+                            </html>
+                          `)
+                          
+                          printWindow.document.close()
+                          printWindow.focus()
+                          
+                          // Esperar a que se cargue la imagen antes de imprimir
+                          setTimeout(() => {
+                            printWindow.print()
+                            printWindow.close()
+                          }, 1000)
+                          
+                        } catch (error) {
+                          console.error('Error al imprimir:', error)
+                          Swal.fire({
+                            icon: 'error',
+                            title: 'Error',
+                            text: 'Ocurrió un error al generar la impresión',
+                            confirmButtonColor: '#dc3545'
+                          })
+                        }
+                      }}
+                      className="btn btn-sm btn-primary"
+                    >
+                      🖨️ Imprimir
+                    </button>
+                  </div>
+                </div>
+                
+                <div className="h-96 chart-acertadas-container">
+                  <Bar
+                    data={preguntasAcertadasData}
+                    options={{
+                      responsive: true,
+                      maintainAspectRatio: false,
+                      plugins: {
+                        title: {
+                          display: true,
+                          text: `Top 3 Preguntas que Más Acertaron - ${typeof categoriaAsignada === 'string' ? categoriaAsignada : categoriaAsignada.nombre}`,
+                          font: {
+                            size: 16,
+                            weight: 'bold'
+                          },
+                          color: '#4d3930'
+                        },
+                        legend: {
+                          display: false
+                        },
+                        tooltip: {
+                          titleFont: { size: 14, weight: 'bold' },
+                          bodyFont: { size: 12 },
+                          padding: 12,
+                          backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                          titleColor: '#ffffff',
+                          bodyColor: '#ffffff',
+                          borderColor: '#10b981',
+                          borderWidth: 2,
+                          cornerRadius: 8,
+                          displayColors: false,
+                          callbacks: {
+                            title: function(context) {
+                              if (!context || !context[0] || !context[0].dataset || !context[0].dataset.fullData) {
+                                return '✅ Pregunta'
+                              }
+                              const preguntaData = context[0].dataset.fullData[context[0].dataIndex]
+                              return `✅ Pregunta ID: ${preguntaData.id}`
+                            },
+                            label: function(context) {
+                              if (!context || !context[0] || !context[0].dataset || !context[0].dataset.fullData) {
+                                return [`🟢 Aciertos: ${context?.parsed?.y || 0}`]
+                              }
+                              const preguntaData = context[0].dataset.fullData[context[0].dataIndex]
+                              return [
+                                `📝 ${preguntaData.pregunta}`,
+                                '',
+                                `🟢 Intentos que acertaron: ${context.parsed.y}`,
+                                '',
+                                '📋 Opciones:'
+                              ]
+                            },
+                            afterBody: function(context) {
+                              if (!context || !context[0] || !context[0].dataset || !context[0].dataset.fullData) {
+                                return []
+                              }
+                              const preguntaData = context[0].dataset.fullData[context[0].dataIndex]
+                              const opciones = preguntaData.opciones || []
+                              const opcionesTexto = opciones.map((op, index) => {
+                                const correcta = op.es_correcta ? '✅' : '❌'
+                                return `  ${String.fromCharCode(65 + index)}) ${correcta} ${op.opcion_texto}`
+                              })
+                              return opcionesTexto
+                            }
+                          }
+                        }
+                      },
+                      scales: {
+                        y: {
+                          beginAtZero: true,
+                          title: {
+                            display: true,
+                            text: 'Intentos que Acertaron',
+                            font: {
+                              weight: 'bold'
+                            },
+                            color: '#4d3930'
+                          },
+                          grid: {
+                            color: 'rgba(0,0,0,0.1)'
+                          }
+                        },
+                        x: {
+                          title: {
+                            display: true,
+                            text: 'Preguntas',
+                            font: {
+                              weight: 'bold'
+                            },
+                            color: '#4d3930'
+                          },
+                          ticks: {
+                            maxRotation: 45,
+                            minRotation: 45,
+                            font: {
+                              size: 10
+                            }
+                          }
+                        }
+                      }
+                    }}
+                  />
+                </div>
+                
+                <div className="mt-4 text-center">
+                  <p className="text-sm text-gray-600">
+                    Gráfico que muestra las 3 preguntas con más respuestas correctas
                   </p>
                 </div>
               </div>

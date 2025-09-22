@@ -15,6 +15,16 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 ### Corregido
 - Actualización patch
 
+## [1.1.0] - 2025-09-22
+
+### Agregado
+- Nuevas funcionalidades: botones de imprimir en gráficos, búsqueda en estudiantes, mejoras en UI
+
+## [1.1.1] - 2025-09-22
+
+### Corregido
+- Corrección del script de actualización de versión
+
 ## [1.0.0] - 2025-09-18
 
 ### Agregado

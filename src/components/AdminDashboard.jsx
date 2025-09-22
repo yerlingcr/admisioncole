@@ -10,6 +10,7 @@ import GestionCategorias from './GestionCategorias'
 import ConfiguracionPrueba from './ConfiguracionPrueba'
 import Estadisticas from './Estadisticas'
 import Reportes from './Reportes'
+import OptimizedStatsService from '../services/optimizedStatsService'
 
 const AdminDashboard = () => {
   const { user, logout, getUserInfo } = useAuth()
@@ -43,50 +44,49 @@ const AdminDashboard = () => {
   const loadSystemStats = async () => {
     try {
       setStatsLoading(true)
-      console.log('🔄 Iniciando carga de estadísticas...')
+      console.log('🚀 Cargando estadísticas optimizadas...')
       
-      // Obtener total de usuarios
-      const { data: usuariosData, error: usuariosError } = await supabase
-        .from('usuarios')
-        .select('*')
-
-      
-      // Obtener total de preguntas
-      const { data: preguntasData, error: preguntasError } = await supabase
-        .from('preguntas_quiz')
-        .select('*')
-
-
-      // Obtener usuarios activos
-      const { data: usuariosActivosData, error: usuariosActivosError } = await supabase
-        .from('usuarios')
-        .select('*')
-        .eq('estado', 'Activo')
-
-      
-      if (usuariosError) {
-        console.error('❌ Error cargando usuarios:', usuariosError)
+      try {
+        // Intentar usar el servicio optimizado primero
+        const statsData = await OptimizedStatsService.getSystemStats()
+        // Estadísticas cargadas exitosamente
+        setStats(statsData)
+      } catch (rpcError) {
+        // Usando método original (RPC no disponible)
+        
+        // Fallback al método original si RPC no funciona
+        const [usuariosResult, preguntasResult, usuariosActivosResult] = await Promise.all([
+          supabase.from('usuarios').select('*'),
+          supabase.from('preguntas_quiz').select('*'),
+          supabase.from('usuarios').select('*').eq('estado', 'Activo')
+        ])
+        
+        const statsData = {
+          total_usuarios: usuariosResult.data?.length || 0,
+          total_preguntas: preguntasResult.data?.length || 0,
+          usuarios_activos: usuariosActivosResult.data?.length || 0,
+          usuarios_inactivos: (usuariosResult.data?.length || 0) - (usuariosActivosResult.data?.length || 0),
+          total_intentos: 0,
+          intentos_completados: 0,
+          promedio_puntuacion: 0
+        }
+        
+        console.log('✅ Estadísticas cargadas con fallback:', statsData)
+        setStats(statsData)
       }
-      
-      if (preguntasError) {
-        console.error('❌ Error cargando preguntas:', preguntasError)
-      }
-
-      if (usuariosActivosError) {
-        console.error('❌ Error cargando usuarios activos:', usuariosActivosError)
-      }
-      
-      // Crear objeto de estadísticas
-      const statsData = {
-        total_usuarios: usuariosData?.length || 0,
-        total_preguntas: preguntasData?.length || 0,
-        usuarios_activos: usuariosActivosData?.length || 0,
-        usuarios_inactivos: (usuariosData?.length || 0) - (usuariosActivosData?.length || 0)
-      }
-      
-      setStats(statsData)
     } catch (error) {
       console.error('❌ Error cargando estadísticas:', error)
+      
+      // Fallback a datos por defecto si hay error
+      setStats({
+        total_usuarios: 0,
+        total_preguntas: 0,
+        usuarios_activos: 0,
+        usuarios_inactivos: 0,
+        total_intentos: 0,
+        intentos_completados: 0,
+        promedio_puntuacion: 0
+      })
     } finally {
       setStatsLoading(false)
     }
@@ -280,34 +280,37 @@ const AdminDashboard = () => {
               </div>
             </li>
 
+            {/* Cerrar Sesión */}
+            <li>
+              <div className="flex items-center p-3 rounded-lg cursor-pointer transition-colors hover:bg-opacity-20"
+                   style={{ 
+                     backgroundColor: 'rgba(180, 123, 33, 0.1)',
+                     ':hover': { backgroundColor: 'rgba(220, 38, 38, 0.2)' }
+                   }}
+                   onClick={handleLogout}
+              >
+                <span className="text-xl mr-3" style={{ color: '#f4b100' }}>🚪</span>
+                <span style={{ color: '#ffffff' }}>Cerrar Sesión</span>
+              </div>
+            </li>
 
           </ul>
         </nav>
 
-        {/* Footer del Sidebar */}
+        {/* Información del Usuario */}
         <div className="absolute bottom-0 left-0 right-0 p-3 border-t" style={{ borderColor: '#b47b21' }}>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center">
-              <div className="w-7 h-7 rounded-full flex items-center justify-center mr-2" style={{ backgroundColor: '#f4b100' }}>
-                <span className="text-xs font-bold" style={{ color: '#4d3930' }}>
-                  {userInfo.nombre.charAt(0)}{userInfo.primer_apellido.charAt(0)}
-                </span>
-              </div>
-              <div>
-                <div className="text-xs font-medium" style={{ color: '#ffffff' }}>
-                  {userInfo.nombre} {userInfo.primer_apellido}
-                </div>
-                <div className="text-xs" style={{ color: '#f4b100' }}>Administrador</div>
-              </div>
+          <div className="flex items-center">
+            <div className="w-7 h-7 rounded-full flex items-center justify-center mr-2" style={{ backgroundColor: '#f4b100' }}>
+              <span className="text-xs font-bold" style={{ color: '#4d3930' }}>
+                {userInfo.nombre.charAt(0)}{userInfo.primer_apellido.charAt(0)}
+              </span>
             </div>
-            <button 
-              onClick={handleLogout}
-              className="btn btn-xs btn-ghost hover:bg-red-600 hover:text-white transition-colors"
-              style={{ color: '#f4b100' }}
-              title="Cerrar Sesión"
-            >
-              🚪 Cerrar
-            </button>
+            <div>
+              <div className="text-xs font-medium" style={{ color: '#ffffff' }}>
+                {userInfo.nombre} {userInfo.primer_apellido}
+              </div>
+              <div className="text-xs" style={{ color: '#f4b100' }}>Administrador</div>
+            </div>
           </div>
         </div>
       </div>

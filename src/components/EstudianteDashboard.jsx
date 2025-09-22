@@ -5,6 +5,7 @@ import LoadingSpinner from './LoadingSpinner'
 import quizService from '../services/quizService'
 import { institucionService } from '../services/institucionService'
 import { supabase } from '../lib/supabaseConfig'
+import OptimizedStatsService from '../services/optimizedStatsService'
 import Swal from 'sweetalert2'
 
 const EstudianteDashboard = () => {
@@ -162,6 +163,27 @@ const EstudianteDashboard = () => {
     try {
       if (!userInfo?.identificacion) return
       
+      console.log('🚀 Cargando datos del estudiante...')
+      
+      try {
+        // Intentar usar el servicio optimizado primero
+        const studentData = await OptimizedStatsService.getStudentData(userInfo.identificacion)
+        
+        if (studentData?.categoria_asignada) {
+          setCategoriaEstudiante(studentData.categoria_asignada)
+          
+          if (studentData?.intentos_usados !== undefined) {
+            setIntentosUsados(studentData.intentos_usados)
+          }
+          
+          // Datos del estudiante cargados exitosamente
+          return
+        }
+      } catch (rpcError) {
+        // Usando método original (RPC no disponible)
+      }
+      
+      // Fallback al método original
       const { data, error } = await supabase
         .from('usuario_categorias')
         .select('categoria')
@@ -171,48 +193,49 @@ const EstudianteDashboard = () => {
 
       if (error) {
         console.error('Error cargando categoría del estudiante:', error)
-        setCategoriaEstudiante('Secretariado Ejecutivo') // Fallback
+        setCategoriaEstudiante('Secretariado Ejecutivo')
         return
       }
 
       if (data?.categoria) {
         setCategoriaEstudiante(data.categoria)
+        // Categoría cargada exitosamente
       } else {
-        setCategoriaEstudiante('Secretariado Ejecutivo') // Fallback
+        setCategoriaEstudiante('Secretariado Ejecutivo')
       }
     } catch (error) {
-      console.error('Error en loadCategoriaEstudiante:', error)
-      setCategoriaEstudiante('Secretariado Ejecutivo') // Fallback
+      console.error('Error cargando datos del estudiante:', error)
+      setCategoriaEstudiante('Secretariado Ejecutivo')
     }
   }
 
   const loadIntentosUsados = async () => {
     try {
-      if (!userInfo?.identificacion) {
-        return;
-      }
-
+      if (!userInfo?.identificacion) return
+      
+      // Si ya se cargaron los datos optimizados, no hacer consulta adicional
+      if (intentosUsados !== 0) return
       
       // Consulta simple solo para contar intentos completados
       const { data, error } = await supabase
         .from('intentos_quiz')
         .select('id')
         .eq('estudiante_id', userInfo.identificacion)
-        .not('fecha_fin', 'is', null);
+        .not('fecha_fin', 'is', null)
 
       if (error) {
-        console.error('❌ Error cargando intentos:', error);
-        setIntentosUsados(0);
-        return;
+        console.error('❌ Error cargando intentos:', error)
+        setIntentosUsados(0)
+        return
       }
 
-      setIntentosUsados(data.length);
+      setIntentosUsados(data.length)
       
     } catch (error) {
-      console.error('❌ Error en loadIntentosUsados:', error);
-      setIntentosUsados(0);
+      console.error('❌ Error en loadIntentosUsados:', error)
+      setIntentosUsados(0)
     }
-  };
+  }
 
   const handleStartQuiz = () => {
     // Validar que el estudiante esté activo
