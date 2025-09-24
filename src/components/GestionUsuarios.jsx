@@ -315,8 +315,8 @@ const GestionUsuarios = () => {
 
         await Swal.fire({
           icon: 'success',
-          title: `¡Usuario ${accion}do!`,
-          text: `El usuario ${usuario.nombre} ha sido ${accion}do exitosamente.`,
+          title: `¡Usuario ${accion === 'activar' ? 'activado' : 'desactivado'}!`,
+          text: `El usuario ${usuario.nombre} ha sido ${accion === 'activar' ? 'activado' : 'desactivado'} exitosamente.`,
           confirmButtonText: 'Entendido',
           confirmButtonColor: '#f4b100',
           background: '#ffffff',

@@ -30,6 +30,11 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 ### Corregido
 - Corrección del bug de categoría en formulario de preguntas
 
+## [1.1.3] - 2025-09-24
+
+### Corregido
+- Corrección ortográfica en mensaje de usuario activado
+
 ## [1.0.0] - 2025-09-18
 
 ### Agregado
