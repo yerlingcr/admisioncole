@@ -83,7 +83,7 @@ const Login = () => {
                     alt="Escudo Vocacional" 
                     className="w-48 h-48 lg:w-64 lg:h-64 mx-auto mb-0 drop-shadow-2xl object-contain"
                   />
-                  <h1 className="text-2xl lg:text-4xl font-bold mb-2 drop-shadow-2xl text-white">Admisión 2025</h1>
+                  <h1 className="text-2xl lg:text-4xl font-bold mb-2 drop-shadow-2xl text-white">C O V O M O S A</h1>
                   <p className="hidden lg:block text-white text-lg drop-shadow-xl font-semibold">Sistema de Gestión Académica</p>
                 </div>
               </div>
@@ -98,7 +98,7 @@ const Login = () => {
 
               {/* Footer del Panel Izquierdo - Solo visible en desktop */}
               <div className="hidden lg:block text-center text-white text-sm relative z-10">
-                <p className="drop-shadow-xl font-medium">© 2025 Sistema de Admisión, ver. 1.1.3</p>
+                <p className="drop-shadow-xl font-medium">© 2025, Todos los Derechos Reservados, ver. 1.1.4</p>
                 <p className="drop-shadow-xl font-medium">
                   Desarrollado por{' '}
                   <a 

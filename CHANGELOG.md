@@ -35,6 +35,11 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 ### Corregido
 - Corrección ortográfica en mensaje de usuario activado
 
+## [1.1.4] - 2025-09-24
+
+### Corregido
+- Actualización de branding en Login: C O V O M O S A y copyright
+
 ## [1.0.0] - 2025-09-18
 
 ### Agregado

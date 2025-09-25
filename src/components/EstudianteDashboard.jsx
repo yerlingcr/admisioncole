@@ -503,7 +503,7 @@ const EstudianteDashboard = () => {
                           className="btn btn-lg border-0 font-bold text-xl px-12 py-4 rounded-2xl shadow-2xl hover:shadow-3xl transition-all duration-300 transform hover:scale-105"
                           style={{ backgroundColor: colors.secondary, color: colors.white }}
                         >
-                          🚀 Empezar Prueba de Admisión
+                          🚀 Iniciar ahora
                         </button>
                         
                         <button
