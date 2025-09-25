@@ -40,6 +40,11 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 ### Corregido
 - Actualización de branding en Login: C O V O M O S A y copyright
 
+## [1.1.5] - 2025-09-25
+
+### Corregido
+- Implementación de configuraciones específicas por categoría
+
 ## [1.0.0] - 2025-09-18
 
 ### Agregado

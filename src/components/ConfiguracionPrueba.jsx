@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { configuracionService } from '../services/configuracionService';
 import { institucionService } from '../services/institucionService';
+import { supabase } from '../lib/supabaseConfig';
 import Swal from 'sweetalert2';
 
 const ConfiguracionPrueba = () => {
@@ -9,8 +10,11 @@ const ConfiguracionPrueba = () => {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingConfig, setEditingConfig] = useState(null);
+  const [isCreatingNew, setIsCreatingNew] = useState(false);
   const [informacionInstitucional, setInformacionInstitucional] = useState(null);
   const [showInstitucionForm, setShowInstitucionForm] = useState(false);
+  const [categoriasDisponibles, setCategoriasDisponibles] = useState([]);
+  const [categoriaSeleccionada, setCategoriaSeleccionada] = useState('General');
   const [institucionFormData, setInstitucionFormData] = useState({
     nombre_centro_educativo: '',
     escudo_centro_url: '',
@@ -18,6 +22,8 @@ const ConfiguracionPrueba = () => {
     descripcion_especialidad: ''
   });
   const [formData, setFormData] = useState({
+    nombre_config: '',
+    categoria: 'General',
     tiempo_limite_minutos: 5,
     total_preguntas: 5,
     puntaje_minimo_aprobacion: 70,
@@ -38,6 +44,7 @@ const ConfiguracionPrueba = () => {
   useEffect(() => {
     loadConfiguraciones();
     loadInformacionInstitucional();
+    loadCategoriasDisponibles();
   }, []);
 
   // Actualizar formData cuando cambie configuracionActiva
@@ -78,6 +85,32 @@ const ConfiguracionPrueba = () => {
       console.error('Error cargando información institucional:', error);
       // Usar información por defecto si hay error
       setInformacionInstitucional(institucionService.getInformacionPorDefecto());
+    }
+  };
+
+  const loadCategoriasDisponibles = async () => {
+    try {
+      // Cargar categorías desde usuario_categorias o preguntas_quiz
+      const { data: categoriasData, error } = await supabase
+        .from('preguntas_quiz')
+        .select('categoria')
+        .not('categoria', 'is', null)
+        .neq('categoria', '');
+
+      if (error) {
+        console.error('Error cargando categorías:', error);
+        setCategoriasDisponibles(['General', 'PNE Secretariado Ejecutivo']);
+        return;
+      }
+
+      // Extraer categorías únicas y agregar 'General' como opción por defecto
+      const categoriasUnicas = [...new Set(categoriasData.map(item => item.categoria))];
+      const categoriasConGeneral = ['General', ...categoriasUnicas.filter(cat => cat !== 'General')];
+      
+      setCategoriasDisponibles(categoriasConGeneral);
+    } catch (error) {
+      console.error('Error cargando categorías:', error);
+      setCategoriasDisponibles(['General', 'PNE Secretariado Ejecutivo']);
     }
   };
 
@@ -170,12 +203,30 @@ const ConfiguracionPrueba = () => {
   };
 
   const resetForm = () => {
-    setFormData(configuracionService.getConfiguracionPorDefecto());
+    setFormData({
+      nombre_config: '',
+      categoria: 'General',
+      tiempo_limite_minutos: 5,
+      total_preguntas: 5,
+      puntaje_minimo_aprobacion: 70,
+      intentos_permitidos: 1,
+      puntaje_por_pregunta: 20,
+      orden_preguntas_aleatorio: true,
+      orden_opciones_aleatorio: true
+    });
     setEditingConfig(null);
+    setIsCreatingNew(false);
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    console.log('🚀 Enviando configuración:', {
+      formData,
+      isCreatingNew,
+      editingConfig,
+      configuracionActiva
+    });
     
     // Validar configuración
     const errores = configuracionService.validarConfiguracion(formData);
@@ -199,36 +250,31 @@ const ConfiguracionPrueba = () => {
         usuario = `${userData.nombre} ${userData.primer_apellido} ${userData.segundo_apellido}`.trim();
       }
       
-      if (configuracionActiva && configuracionActiva.id) {
-        try {
-          
-          await configuracionService.actualizarConfiguracion(
-            configuracionActiva.id, 
-            formData, 
-            usuario
-          );
-          Swal.fire({
-            icon: 'success',
-            title: '¡Configuración actualizada!',
-            text: 'Los cambios se han guardado correctamente',
-            confirmButtonColor: colors.primary
-          });
-          
-          // Recargar configuraciones para actualizar el estado
-          await loadConfiguraciones();
-        } catch (updateError) {
-          console.log('Error al actualizar, creando nueva configuración:', updateError);
-          // Si falla la actualización, crear una nueva
-          await configuracionService.crearConfiguracion(formData, usuario);
-          Swal.fire({
-            icon: 'success',
-            title: '¡Configuración creada!',
-            text: 'Se creó una nueva configuración activa',
-            confirmButtonColor: colors.primary
-          });
-        }
+      if (isCreatingNew) {
+        // Crear nueva configuración
+        await configuracionService.crearConfiguracion(formData, usuario, formData.categoria);
+        Swal.fire({
+          icon: 'success',
+          title: '¡Configuración creada!',
+          text: 'La configuración está ahora activa',
+          confirmButtonColor: colors.primary
+        });
+      } else if (editingConfig && editingConfig.id) {
+        // Actualizar configuración existente
+        await configuracionService.actualizarConfiguracion(
+          editingConfig.id, 
+          formData, 
+          usuario
+        );
+        Swal.fire({
+          icon: 'success',
+          title: '¡Configuración actualizada!',
+          text: 'Los cambios se han guardado correctamente',
+          confirmButtonColor: colors.primary
+        });
       } else {
-        await configuracionService.crearConfiguracion(formData, usuario);
+        // Fallback: crear nueva configuración
+        await configuracionService.crearConfiguracion(formData, usuario, formData.categoria);
         Swal.fire({
           icon: 'success',
           title: '¡Configuración creada!',
@@ -255,6 +301,7 @@ const ConfiguracionPrueba = () => {
     const configMapeada = configuracionService.mapearConfiguracionParaFormulario(config);
     setFormData(configMapeada);
     setEditingConfig(config);
+    setIsCreatingNew(false);
     setShowForm(true);
   };
 
@@ -355,7 +402,8 @@ const ConfiguracionPrueba = () => {
           // Si no hay configuración activa, crear una nueva
           await configuracionService.crearConfiguracion(
             configuracionService.getConfiguracionPorDefecto(), 
-            usuario
+            usuario,
+            'General'
           );
         }
         
@@ -421,15 +469,29 @@ const ConfiguracionPrueba = () => {
           >
             Restaurar Valores por Defecto
           </button>
-          {configuracionActiva && (
+          <div className="flex gap-2">
             <button
-              onClick={() => handleEdit(configuracionActiva)}
+              onClick={() => {
+                setIsCreatingNew(true);
+                setEditingConfig(null);
+                setShowForm(true);
+                resetForm();
+              }}
               className="btn"
-              style={{ backgroundColor: colors.primary, color: colors.white }}
+              style={{ backgroundColor: colors.secondary, color: colors.white }}
             >
-              Editar Configuración
+              ➕ Nueva Configuración
             </button>
-          )}
+            {configuracionActiva && (
+              <button
+                onClick={() => handleEdit(configuracionActiva)}
+                className="btn"
+                style={{ backgroundColor: colors.primary, color: colors.white }}
+              >
+                ✏️ Editar Configuración
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -475,7 +537,44 @@ const ConfiguracionPrueba = () => {
               Editar Configuración de la Prueba
             </h3>
             <form onSubmit={handleSubmit} className="space-y-4">
+              {/* Selector de Categoría */}
+              <div className="form-control">
+                <label className="label">
+                  <span className="label-text font-semibold">Categoría</span>
+                </label>
+                <select
+                  name="categoria"
+                  value={formData.categoria}
+                  onChange={handleInputChange}
+                  className="select select-bordered"
+                  required
+                >
+                  {categoriasDisponibles.map(categoria => (
+                    <option key={categoria} value={categoria}>
+                      {categoria}
+                    </option>
+                  ))}
+                </select>
+                <label className="label">
+                  <span className="label-text-alt">Selecciona la categoría para esta configuración</span>
+                </label>
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="form-control">
+                  <label className="label">
+                    <span className="label-text font-semibold">Nombre de la configuración</span>
+                  </label>
+                  <input
+                    type="text"
+                    name="nombre_config"
+                    value={formData.nombre_config}
+                    onChange={handleInputChange}
+                    className="input input-bordered"
+                    placeholder={`Configuración ${formData.categoria}`}
+                  />
+                </div>
+
                 <div className="form-control">
                   <label className="label">
                     <span className="label-text font-semibold">Tiempo límite (minutos)</span>
@@ -608,6 +707,84 @@ const ConfiguracionPrueba = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Lista de Todas las Configuraciones por Categoría */}
+      {configuraciones.length > 0 && (
+        <div className="card mb-6">
+          <div className="card-body">
+            <h3 className="card-title mb-4">
+              📋 Todas las Configuraciones por Categoría
+            </h3>
+            
+            <div className="space-y-4">
+              {categoriasDisponibles.map(categoria => {
+                const configsDeCategoria = configuraciones.filter(config => config.categoria === categoria);
+                if (configsDeCategoria.length === 0) return null;
+                
+                return (
+                  <div key={categoria} className="border rounded-lg p-4" style={{ borderColor: colors.accent + '40' }}>
+                    <h4 className="font-bold text-lg mb-3" style={{ color: colors.primary }}>
+                      📁 {categoria}
+                    </h4>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {configsDeCategoria.map(config => (
+                        <div 
+                          key={config.id} 
+                          className={`p-3 rounded-lg border ${
+                            config.activa ? 'bg-green-50 border-green-300' : 'bg-gray-50 border-gray-300'
+                          }`}
+                        >
+                          <div className="flex justify-between items-start mb-2">
+                            <h5 className="font-semibold" style={{ color: colors.primary }}>
+                              {config.nombre_config || `Configuración ${config.id}`}
+                            </h5>
+                            {config.activa && (
+                              <span className="badge badge-success badge-sm">ACTIVA</span>
+                            )}
+                          </div>
+                          
+                          <div className="text-sm space-y-1">
+                            <p><strong>Tiempo:</strong> {config.tiempo_limite_minutos} min</p>
+                            <p><strong>Preguntas:</strong> {config.total_preguntas}</p>
+                            <p><strong>Intentos:</strong> {config.intentos_permitidos}</p>
+                            <p><strong>Puntaje mín:</strong> {config.puntuacion_minima_aprobacion}%</p>
+                          </div>
+                          
+                          <div className="flex gap-1 mt-3">
+                            <button
+                              onClick={() => handleEdit(config)}
+                              className="btn btn-xs btn-outline"
+                              style={{ borderColor: colors.primary, color: colors.primary }}
+                            >
+                              ✏️
+                            </button>
+                            {!config.activa && (
+                              <button
+                                onClick={() => handleActivar(config)}
+                                className="btn btn-xs"
+                                style={{ backgroundColor: colors.secondary, color: colors.white }}
+                              >
+                                ▶️
+                              </button>
+                            )}
+                            <button
+                              onClick={() => handleDelete(config)}
+                              className="btn btn-xs btn-error btn-outline"
+                            >
+                              🗑️
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
       )}

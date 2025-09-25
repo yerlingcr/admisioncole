@@ -4,10 +4,10 @@ import usuarioCategoriasService from './usuarioCategoriasService'
 
 class QuizService {
   // Obtener configuración del quiz
-  async getQuizConfig() {
+  async getQuizConfig(categoriaEstudiante = null) {
     try {
-      // Usar el nuevo servicio de configuración
-      const config = await configuracionService.getConfiguracionActiva()
+      // Usar el nuevo servicio de configuración con la categoría específica
+      const config = await configuracionService.getConfiguracionActiva(categoriaEstudiante)
       return config
     } catch (error) {
       console.error('Error obteniendo configuración del quiz:', error)
@@ -325,9 +325,20 @@ class QuizService {
   async canStudentTakeQuiz(estudianteId) {
     try {
       
-      // Verificar configuración del sistema
+      // Obtener categoría del estudiante
+      let categoriaEstudiante = null
       try {
-        const config = await configuracionService.getConfiguracionActiva()
+        const categorias = await usuarioCategoriasService.getCategoriasByUsuario(estudianteId)
+        if (categorias && categorias.length > 0) {
+          categoriaEstudiante = categorias[0] // Usar la primera categoría asignada
+        }
+      } catch (error) {
+        console.log('No se pudo obtener categoría del estudiante para verificación')
+      }
+
+      // Verificar configuración del sistema (específica para la categoría)
+      try {
+        const config = await configuracionService.getConfiguracionActiva(categoriaEstudiante)
         
         if (!config) {
           return {

@@ -5,6 +5,7 @@ import LoadingSpinner from './LoadingSpinner'
 import ThemeToggle from './ThemeToggle'
 import quizService from '../services/quizService'
 import { institucionService } from '../services/institucionService'
+import usuarioCategoriasService from '../services/usuarioCategoriasService'
 import Swal from 'sweetalert2'
 
 const Quiz = () => {
@@ -150,10 +151,22 @@ const Quiz = () => {
         return
       }
 
-      // Obtener configuración del quiz
-      const config = await quizService.getQuizConfig()
+      // Obtener categoría del estudiante para cargar configuración específica
+      let categoriaEstudiante = null
+      try {
+        const categorias = await usuarioCategoriasService.getCategoriasByUsuario(userInfo.identificacion)
+        if (categorias && categorias.length > 0) {
+          categoriaEstudiante = categorias[0] // Usar la primera categoría asignada
+        }
+      } catch (error) {
+        console.log('No se pudo obtener categoría del estudiante, usando configuración general')
+      }
+
+      // Obtener configuración del quiz específica para la categoría
+      const config = await quizService.getQuizConfig(categoriaEstudiante)
       setQuizConfig(config)
       setTimeLeft(config.tiempo_limite_minutos * 60)
+      console.log('🎯 Quiz configurado para categoría:', categoriaEstudiante, config)
 
       // Obtener preguntas del quiz (con categorías específicas del usuario)
       const quizQuestions = await quizService.getQuizQuestions(config.total_preguntas, null, userInfo.identificacion)
@@ -455,32 +468,49 @@ const Quiz = () => {
           
           {/* Progreso de Preguntas Compacto */}
           <div className="mb-4">
-            <div className="flex justify-between items-center mb-2">
+            <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center mb-2 gap-2">
               <h2 className="text-lg font-bold" style={{ color: colors.white }}>Pregunta {currentQuestion + 1} de {questions.length}</h2>
-              <div className="flex space-x-1">
-                {questions.map((_, index) => (
-                  <button
-                    key={index}
-                    onClick={() => setCurrentQuestion(index)}
-                    className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
-                      index === currentQuestion
-                        ? 'text-white'
-                        : answers[questions[index].id]
-                        ? 'text-white'
-                        : 'text-white hover:bg-opacity-30'
-                    }`}
-                    style={{
-                      backgroundColor: index === currentQuestion 
-                        ? colors.accent 
-                        : answers[questions[index].id]
-                        ? colors.secondary
-                        : colors.primary + '40'
-                    }}
-                  >
-                    {index + 1}
-                  </button>
-                ))}
-              </div>
+              
+              {/* Indicador de progreso adaptativo */}
+              {questions.length <= 25 ? (
+                <div className="flex flex-wrap gap-1 justify-center lg:justify-end">
+                  {questions.map((_, index) => (
+                    <button
+                      key={index}
+                      onClick={() => setCurrentQuestion(index)}
+                      className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
+                        index === currentQuestion
+                          ? 'text-white'
+                          : answers[questions[index].id]
+                          ? 'text-white'
+                          : 'text-white hover:bg-opacity-30'
+                      }`}
+                      style={{
+                        backgroundColor: index === currentQuestion 
+                          ? colors.accent 
+                          : answers[questions[index].id]
+                          ? colors.secondary
+                          : colors.primary + '40'
+                      }}
+                    >
+                      {index + 1}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-white">Progreso:</span>
+                  <div className="flex-1 bg-gray-300 rounded-full h-2 w-32 lg:w-48">
+                    <div 
+                      className="bg-yellow-400 h-2 rounded-full transition-all duration-300"
+                      style={{ width: `${((currentQuestion + 1) / questions.length) * 100}%` }}
+                    ></div>
+                  </div>
+                  <span className="text-sm text-white font-bold">
+                    {Math.round(((currentQuestion + 1) / questions.length) * 100)}%
+                  </span>
+                </div>
+              )}
             </div>
             
             {/* Barra de progreso */}

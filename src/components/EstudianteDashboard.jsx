@@ -37,7 +37,6 @@ const EstudianteDashboard = () => {
   useEffect(() => {
     if (userInfo?.identificacion) {
       checkQuizStatus()
-      loadQuizConfig()
       loadInformacionInstitucional()
       loadIntentosUsados()
       loadCategoriaEstudiante()
@@ -45,6 +44,13 @@ const EstudianteDashboard = () => {
       console.log('⏳ Esperando userInfo para cargar datos...');
     }
   }, [userInfo?.identificacion])
+
+  // Cargar configuración del quiz después de que se cargue la categoría
+  useEffect(() => {
+    if (categoriaEstudiante) {
+      loadQuizConfig()
+    }
+  }, [categoriaEstudiante])
 
   // Refrescar datos cuando regreses al dashboard (solo si viene de otra página)
   useEffect(() => {
@@ -134,8 +140,10 @@ const EstudianteDashboard = () => {
 
   const loadQuizConfig = async () => {
     try {
-      const config = await quizService.getQuizConfig()
+      // Pasar la categoría del estudiante para obtener la configuración específica
+      const config = await quizService.getQuizConfig(categoriaEstudiante)
       setQuizConfig(config)
+      console.log('🎯 Configuración cargada para categoría:', categoriaEstudiante, 'Tiempo:', config?.tiempo_limite_minutos, 'min, Preguntas:', config?.total_preguntas)
     } catch (error) {
       console.error('Error cargando configuración del quiz:', error)
       // Usar configuración por defecto si hay error
@@ -170,6 +178,7 @@ const EstudianteDashboard = () => {
         const studentData = await OptimizedStatsService.getStudentData(userInfo.identificacion)
         
         if (studentData?.categoria_asignada) {
+          console.log('📚 Categoría del estudiante (optimizado):', studentData.categoria_asignada)
           setCategoriaEstudiante(studentData.categoria_asignada)
           
           if (studentData?.intentos_usados !== undefined) {
@@ -193,19 +202,20 @@ const EstudianteDashboard = () => {
 
       if (error) {
         console.error('Error cargando categoría del estudiante:', error)
-        setCategoriaEstudiante('Secretariado Ejecutivo')
+        setCategoriaEstudiante('PNE Secretariado Ejecutivo')
         return
       }
 
       if (data?.categoria) {
+        console.log('📚 Categoría del estudiante (fallback):', data.categoria)
         setCategoriaEstudiante(data.categoria)
         // Categoría cargada exitosamente
       } else {
-        setCategoriaEstudiante('Secretariado Ejecutivo')
+        setCategoriaEstudiante('PNE Secretariado Ejecutivo')
       }
     } catch (error) {
       console.error('Error cargando datos del estudiante:', error)
-      setCategoriaEstudiante('Secretariado Ejecutivo')
+      setCategoriaEstudiante('PNE Secretariado Ejecutivo')
     }
   }
 
@@ -278,8 +288,8 @@ const EstudianteDashboard = () => {
         await Promise.all([
           checkQuizStatus(),
           loadIntentosUsados(),
-          loadQuizConfig(),
-          loadInformacionInstitucional()
+          loadInformacionInstitucional(),
+          loadCategoriaEstudiante()
         ]);
       } catch (error) {
         console.error('❌ Error refrescando datos del dashboard:', error);

@@ -1,14 +1,42 @@
 import { supabase } from '../lib/supabaseConfig';
 
 export const configuracionService = {
-  // Obtener la configuración activa de la prueba
-  async getConfiguracionActiva() {
+  // Obtener la configuración activa de la prueba (general o para una categoría específica)
+  async getConfiguracionActiva(categoria = null) {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('configuracion_quiz')
         .select('*')
-        .eq('activa', true)
-        .single();
+        .eq('activa', true);
+
+      if (categoria) {
+        // Buscar configuración específica para la categoría
+        query = query.eq('categoria', categoria);
+      } else {
+        // Buscar configuración general (categoría 'General' o NULL)
+        query = query.or('categoria.is.null,categoria.eq.General');
+      }
+
+      const { data, error } = await query.single();
+
+      if (error && error.code === 'PGRST116') {
+        // Si no encuentra configuración específica para la categoría, buscar la general
+        if (categoria) {
+          const { data: generalData, error: generalError } = await supabase
+            .from('configuracion_quiz')
+            .select('*')
+            .eq('activa', true)
+            .or('categoria.is.null,categoria.eq.General')
+            .single();
+
+          if (generalError) {
+            console.error('Error obteniendo configuración general:', generalError);
+            throw generalError;
+          }
+          return generalData;
+        }
+        throw error;
+      }
 
       if (error) {
         console.error('Error obteniendo configuración:', error);
@@ -28,6 +56,7 @@ export const configuracionService = {
       const { data, error } = await supabase
         .from('configuracion_quiz')
         .select('*')
+        .order('categoria', { ascending: true })
         .order('fecha_creacion', { ascending: false });
 
       if (error) {
@@ -42,17 +71,64 @@ export const configuracionService = {
     }
   },
 
-  // Crear nueva configuración
-  async crearConfiguracion(configuracion, usuario) {
+  // Obtener configuraciones por categoría
+  async getConfiguracionesPorCategoria(categoria) {
     try {
-      // Desactivar configuraciones anteriores
+      const { data, error } = await supabase
+        .from('configuracion_quiz')
+        .select('*')
+        .eq('categoria', categoria)
+        .order('fecha_creacion', { ascending: false });
+
+      if (error) {
+        console.error('Error obteniendo configuraciones por categoría:', error);
+        throw error;
+      }
+
+      return data || [];
+    } catch (error) {
+      console.error('Error en getConfiguracionesPorCategoria:', error);
+      throw error;
+    }
+  },
+
+  // Obtener todas las categorías que tienen configuraciones
+  async getCategoriasConConfiguracion() {
+    try {
+      const { data, error } = await supabase
+        .from('configuracion_quiz')
+        .select('categoria')
+        .not('categoria', 'is', null)
+        .neq('categoria', '');
+
+      if (error) {
+        console.error('Error obteniendo categorías:', error);
+        throw error;
+      }
+
+      // Extraer categorías únicas
+      const categoriasUnicas = [...new Set(data.map(item => item.categoria))];
+      return categoriasUnicas;
+    } catch (error) {
+      console.error('Error en getCategoriasConConfiguracion:', error);
+      throw error;
+    }
+  },
+
+  // Crear nueva configuración
+  async crearConfiguracion(configuracion, usuario, categoria = 'General') {
+    try {
+      // Desactivar configuraciones anteriores de la misma categoría
       await supabase
         .from('configuracion_quiz')
         .update({ activa: false })
-        .eq('activa', true);
+        .eq('activa', true)
+        .eq('categoria', categoria);
 
       // Mapear campos del formulario a la base de datos
       const configData = {
+        nombre_config: configuracion.nombre_config || `Configuración ${categoria}`,
+        categoria: categoria,
         tiempo_limite_minutos: configuracion.tiempo_limite_minutos,
         total_preguntas: configuracion.total_preguntas,
         puntuacion_minima_aprobacion: configuracion.puntaje_minimo_aprobacion,
@@ -188,8 +264,10 @@ export const configuracionService = {
   // Mapear configuración de la base de datos al formulario
   mapearConfiguracionParaFormulario(configuracion) {
     return {
+      nombre_config: configuracion.nombre_config || '',
+      categoria: configuracion.categoria || 'General',
       tiempo_limite_minutos: configuracion.tiempo_limite_minutos || 5,
-      numero_preguntas: configuracion.total_preguntas || configuracion.numero_preguntas || 5,
+      total_preguntas: configuracion.total_preguntas || configuracion.numero_preguntas || 5,
       puntaje_minimo_aprobacion: configuracion.puntuacion_minima_aprobacion || configuracion.puntaje_minimo_aprobacion || 70,
       intentos_permitidos: configuracion.intentos_permitidos || 2,
       puntaje_por_pregunta: configuracion.puntaje_por_pregunta || 20,
