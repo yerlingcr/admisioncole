@@ -13,6 +13,7 @@ import ConfiguracionPrueba from './components/ConfiguracionPrueba'
 import ProfesorDashboard from './components/ProfesorDashboard'
 import ProfesorGestionPreguntas from './components/ProfesorGestionPreguntas'
 import ProfesorGestionEstudiantes from './components/ProfesorGestionEstudiantes'
+import VerificarEstudiante from './components/VerificarEstudiante'
 import ThemeToggle from './components/ThemeToggle'
 
 function App() {
@@ -68,6 +69,7 @@ function App() {
                     <Route path="dashboard" element={<ProfesorDashboard />} />
                     <Route path="gestion-preguntas" element={<ProfesorGestionPreguntas />} />
                     <Route path="gestion-estudiantes" element={<ProfesorGestionEstudiantes />} />
+                    <Route path="verificar" element={<VerificarEstudiante />} />
                     <Route path="*" element={<Navigate to="dashboard" replace />} />
                   </Routes>
                 </ProtectedRoute>

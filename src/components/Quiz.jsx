@@ -302,83 +302,358 @@ const Quiz = () => {
         return
       }
 
-      // Calcular puntuación
-      let correctAnswers = 0
       const totalQuestions = questions.length
-
-      questions.forEach(question => {
-        const userAnswer = answers[question.id]
-        if (userAnswer) {
-          const selectedOption = question.opciones.find(opt => opt.id === userAnswer)
-          if (selectedOption && selectedOption.es_correcta) {
-            correctAnswers++
-          }
-        }
-      })
-
-      const score = Math.round((correctAnswers / totalQuestions) * 100)
-      const timeUsed = (quizConfig.tiempo_limite_minutos * 60) - timeLeft
-
-      // Finalizar intento en Supabase
-      await quizService.finishQuizAttempt(
-        currentAttempt.id,
-        timeUsed,
-        score,
-        questions.filter(q => answers[q.id]).length,
-        correctAnswers
-      )
-
-      // Limpiar progreso guardado al completar el quiz
-      localStorage.removeItem('quizProgress')
-
-      // Mostrar mensaje específico si se acabó el tiempo
-      if (isTimeUp) {
+      const answeredQuestions = questions.filter(q => answers[q.id]).length
+      
+      // Verificar si se han contestado todas las preguntas (excepto si se acabó el tiempo)
+      if (!isTimeUp && answeredQuestions < totalQuestions) {
+        const unansweredCount = totalQuestions - answeredQuestions
         await Swal.fire({
-          title: '⏰ Tiempo Agotado',
+          title: '❌ Prueba Incompleta',
           html: `
             <div style="text-align: left;">
-              <p><strong>Se ha agotado el tiempo para completar la prueba.</strong></p>
+              <p><strong>No puedes finalizar la prueba sin contestar todas las preguntas.</strong></p>
               <br>
-              <p><strong>Tu prueba ha sido enviada automáticamente con:</strong></p>
+              <p><strong>Tienes ${unansweredCount} pregunta${unansweredCount > 1 ? 's' : ''} sin contestar:</strong></p>
               <ul style="margin-left: 20px;">
-                <li><strong>Preguntas respondidas:</strong> ${questions.filter(q => answers[q.id]).length} de ${totalQuestions}</li>
-                <li><strong>Tiempo utilizado:</strong> ${Math.floor(timeUsed / 60)}:${(timeUsed % 60).toString().padStart(2, '0')}</li>
-                <li><strong>Respuestas correctas:</strong> ${correctAnswers}</li>
+                ${questions.filter(q => !answers[q.id]).map((q, index) => 
+                  `<li>Pregunta ${questions.indexOf(q) + 1}</li>`
+                ).join('')}
               </ul>
               <br>
-              <p><strong>Los resultados serán evaluados y publicados próximamente.</strong></p>
+              <p><strong>Por favor, regresa y completa todas las preguntas antes de finalizar.</strong></p>
             </div>
           `,
           icon: 'warning',
-          confirmButtonText: 'Ver Resultados',
+          confirmButtonText: 'Continuar Prueba',
           confirmButtonColor: '#f4b100',
           background: '#ffffff',
-          color: '#4d3930',
-          timer: 8000,
-          timerProgressBar: true
+          color: '#4d3930'
         })
+        return // No permitir finalizar
       }
 
-      // Navegar a los resultados
-      navigate('/estudiante/resultado', {
-        state: {
-          quizData: {
-            answers,
-            questions,
-            timeLeft,
-            userInfo,
-            score,
-            correctAnswers,
-            totalQuestions,
-            timeUsed,
-            isTimeUp // Agregar flag para saber si se acabó el tiempo
+      // Mostrar mensaje de confirmación antes de finalizar
+      if (!isTimeUp) {
+        const confirmResult = await Swal.fire({
+          title: '🏁 Finalizar Prueba',
+          html: `
+            <div style="text-align: left;">
+              <p><strong>¿Estás seguro de que quieres finalizar la prueba?</strong></p>
+              <br>
+              <p><strong>Resumen de tu prueba:</strong></p>
+              <ul style="margin-left: 20px;">
+                <li><strong>Total de preguntas:</strong> ${totalQuestions}</li>
+                <li><strong>Preguntas respondidas:</strong> ${answeredQuestions}</li>
+                <li><strong>Tiempo restante:</strong> ${formatTime(timeLeft)}</li>
+              </ul>
+              <br>
+              <p><em>Una vez finalizada, no podrás modificar tus respuestas.</em></p>
+            </div>
+          `,
+          icon: 'question',
+          showCancelButton: true,
+          confirmButtonText: 'Sí, Finalizar',
+          cancelButtonText: 'Cancelar',
+          confirmButtonColor: '#f4b100',
+          cancelButtonColor: '#d33',
+          background: '#ffffff',
+          color: '#4d3930'
+        })
+        
+        if (!confirmResult.isConfirmed) {
+          return // Usuario canceló
+        }
+      }
+
+      // Mostrar loading mientras se guarda
+      const loadingSwal = Swal.fire({
+        title: '💾 Guardando respuestas...',
+        html: 'Por favor espera mientras guardamos todas tus respuestas.<br/><br/><i class="fa fa-spinner fa-spin"></i>',
+        allowOutsideClick: false,
+        allowEscapeKey: false,
+        showConfirmButton: false,
+        background: '#ffffff',
+        color: '#4d3930'
+      })
+
+      try {
+        // Verificar y guardar respuestas faltantes
+        const respuestasGuardadas = []
+        const erroresGuardado = []
+        
+        for (const question of questions) {
+          const userAnswer = answers[question.id]
+          if (userAnswer) {
+            try {
+              const questionObj = question
+              const selectedOption = questionObj.opciones.find(opt => opt.id === userAnswer)
+              const isCorrect = selectedOption?.es_correcta || false
+
+              await quizService.saveStudentAnswer(
+                currentAttempt.id,
+                question.id,
+                userAnswer,
+                0, // tiempo_respuesta (por ahora 0)
+                isCorrect
+              )
+              
+              respuestasGuardadas.push({
+                preguntaId: question.id,
+                preguntaNumero: questions.indexOf(question) + 1,
+                opcionId: userAnswer,
+                esCorrecta: isCorrect
+              })
+            } catch (error) {
+              console.error(`Error guardando respuesta pregunta ${questions.indexOf(question) + 1}:`, error)
+              erroresGuardado.push({
+                preguntaNumero: questions.indexOf(question) + 1,
+                preguntaId: question.id,
+                opcionId: userAnswer,
+                error: error.message,
+                intentoId: currentAttempt.id
+              })
+            }
           }
         }
-      })
+
+        // Verificar que todas las respuestas se guardaron correctamente
+        if (erroresGuardado.length > 0) {
+          console.error('Errores al guardar respuestas:', erroresGuardado)
+          const resultadoReintento = await Swal.fire({
+            title: '⚠️ Error al Guardar Respuestas',
+            html: `
+              <div style="text-align: left;">
+                <p><strong>Hubo problemas guardando ${erroresGuardado.length} respuesta(s):</strong></p>
+                <ul style="margin-left: 20px; max-height: 150px; overflow-y: auto;">
+                  ${erroresGuardado.map(error => 
+                    `<li>Pregunta ${error.preguntaNumero}: ${error.error}</li>`
+                  ).join('')}
+                </ul>
+                <br>
+                <p><strong>Esto puede causar inconsistencias en la calificación.</strong></p>
+                <p><strong>¿Qué deseas hacer?</strong></p>
+              </div>
+            `,
+            icon: 'warning',
+            showCancelButton: true,
+            showDenyButton: true,
+            confirmButtonText: 'Reintentar Todo',
+            denyButtonText: 'Reintentar Errores',
+            cancelButtonText: 'Continuar Sin Guardar',
+            confirmButtonColor: '#f4b100',
+            denyButtonColor: '#28a745',
+            cancelButtonColor: '#d33',
+            background: '#ffffff',
+            color: '#4d3930'
+          })
+
+          if (resultadoReintento.isConfirmed) {
+            // Reintentar todo el proceso de guardado
+            await handleFinishQuiz(isTimeUp)
+            return
+          } else if (resultadoReintento.isDenied) {
+            // Reintentar solo las respuestas con errores
+            let reintentosExitosos = 0
+            for (const errorItem of erroresGuardado) {
+              try {
+                const question = questions.find(q => q.id === errorItem.preguntaId)
+                if (question) {
+                  const selectedOption = question.opciones.find(opt => opt.id === errorItem.opcionId)
+                  const isCorrect = selectedOption?.es_correcta || false
+
+                  await quizService.saveStudentAnswer(
+                    errorItem.intentoId,
+                    errorItem.preguntaId,
+                    errorItem.opcionId,
+                    0,
+                    isCorrect
+                  )
+                  reintentosExitosos++
+                  console.log(`✅ Respuesta pregunta ${errorItem.preguntaNumero} guardada exitosamente`)
+                }
+              } catch (retryError) {
+                console.error(`❌ Reintento fallido pregunta ${errorItem.preguntaNumero}:`, retryError)
+              }
+            }
+            
+            if (reintentosExitosos > 0) {
+              await Swal.fire({
+                title: '✅ Parcialmente Corregido',
+                text: `Se lograron guardar ${reintentosExitosos} de ${erroresGuardado.length} respuestas pendientes`,
+                icon: 'success',
+                timer: 2000,
+                background: '#ffffff',
+                color: '#4d3930'
+              })
+            }
+          }
+        }
+
+        // Calcular puntuación basándome en las respuestas REALMENTE guardadas
+        let correctAnswers = 0
+        respuestasGuardadas.forEach(respuestaGuardada => {
+          if (respuestaGuardada.esCorrecta) {
+            correctAnswers++
+          }
+        })
+
+        const score = Math.round((correctAnswers / totalQuestions) * 100)
+        const timeUsed = (quizConfig.tiempo_limite_minutos * 60) - timeLeft
+
+        // AUDITORÍA ANTES DE FINALIZAR - Verificar consistencia de datos
+        console.log('🔍 AUDITORÍA ANTES DE FINALIZAR:', {
+          respuestasGuardadasExitosas: respuestasGuardadas.length,
+          respuestasCorrectasCalculadas: correctAnswers,
+          erroresGuardado: erroresGuardado.length,
+          totalPreguntas: totalQuestions,
+          intentoId: currentAttempt.id
+        })
+
+        // SINCRONIZACIÓN AUTOMÁTICA: Finalizar intento con datos REALES
+        await quizService.finishQuizAttempt(
+          currentAttempt.id,
+          timeUsed,
+          score,
+          respuestasGuardadas.length, // Usar respuestas REALMENTE guardadas
+          correctAnswers // Usar conteo REAL
+        )
+
+        // Cerrar loading
+        await loadingSwal.close()
+
+        // VERIFICACIÓN FINAL DE SINCRONIZACIÓN
+        console.log('📊 Datos finales del quiz:', {
+          estudiante: userInfo.identificacion,
+          totalPreguntas: totalQuestions,
+          preguntasRespondidas: respuestasGuardadas.length, // Datos REALES guardados
+          respuestasCorrectas: correctAnswers,
+          puntuacionFinal: score,
+          tiempoUtilizado: timeUsed,
+          respuestasGuardadas: respuestasGuardadas.length,
+          erroresGuardado: erroresGuardado.length,
+          sincronizadoExitosamente: erroresGuardado.length === 0
+        })
+
+        // Mostrar resultado basado en sincronización exitosa
+        if (erroresGuardado.length === 0) {
+          console.log('✅ QUIZ FINALIZADO CORRECTAMENTE - Datos sincronizados')
+        } else {
+          console.error('⚠️ QUIZ FINALIZADO CON ERRORES - Datos parcialmente sincronizados')
+        }
+
+        // Limpiar progreso guardado al completar el quiz
+        localStorage.removeItem('quizProgress')
+
+        // Mostrar mensaje específico si se acabó el tiempo
+        if (isTimeUp) {
+          await Swal.fire({
+            title: '⏰ Tiempo Agotado',
+            html: `
+              <div style="text-align: left;">
+                <p><strong>Se ha agotado el tiempo para completar la prueba.</strong></p>
+                <br>
+                <p><strong>Tu prueba ha sido enviada automáticamente con:</strong></p>
+                <ul style="margin-left: 20px;">
+                  <li><strong>Preguntas respondidas:</strong> ${answeredQuestions} de ${totalQuestions}</li>
+                  <li><strong>Tiempo utilizado:</strong> ${Math.floor(timeUsed / 60)}:${(timeUsed % 60).toString().padStart(2, '0')}</li>
+                  <li><strong>Respuestas guardadas:</strong> ${respuestasGuardadas.length}</li>
+                </ul>
+                <br>
+                <p><strong>Los resultados serán evaluados y publicados próximamente.</strong></p>
+              </div>
+            `,
+            icon: 'warning',
+            confirmButtonText: 'Aceptar',
+            confirmButtonColor: '#f4b100',
+            background: '#ffffff',
+            color: '#4d3930',
+            timer: 8000,
+            timerProgressBar: true
+          })
+        } else {
+          // Mostrar confirmación de éxito
+          await Swal.fire({
+            title: '✅ Prueba Completada',
+            html: `
+              <div style="text-align: left;">
+                <p><strong>¡Tu prueba se ha completado exitosamente!</strong></p>
+                <br>
+                <p><strong>Resumen final:</strong></p>
+                <ul style="margin-left: 20px;">
+                  <li><strong>Total de preguntas:</strong> ${totalQuestions}</li>
+                  <li><strong>Preguntas respondidas:</strong> ${answeredQuestions}</li>
+                  <li><strong>Tiempo utilizado:</strong> ${Math.floor(timeUsed / 60)}:${(timeUsed % 60).toString().padStart(2, '0')}</li>
+                </ul>
+                <br>
+                <p><strong>¡Todos tus datos han sido guardados correctamente!</strong></p>
+                <p><strong>Los resultados serán evaluados y publicados próximamente por nuestro equipo académico.</strong></p>
+              </div>
+            `,
+            icon: 'success',
+            confirmButtonText: 'Aceptar',
+            confirmButtonColor: '#f4b100',
+            background: '#ffffff',
+            color: '#4d3930',
+            timer: 5000,
+            timerProgressBar: true
+          })
+        }
+
+        // Navegar a los resultados
+        navigate('/estudiante/resultado', {
+          state: {
+            quizData: {
+              answers,
+              questions,
+              timeLeft,
+              userInfo,
+              score,
+              correctAnswers,
+              totalQuestions,
+              timeUsed,
+              isTimeUp,
+              respuestasGuardadas, // Agregar información de respuestas guardadas
+              erroresGuardado // Agregar información de errores si los hubo
+            }
+          }
+        })
+
+      } catch (error) {
+        await loadingSwal.close()
+        console.error('Error crítico guardando respuestas:', error)
+        
+        await Swal.fire({
+          title: '❌ Error Crítico',
+          html: `
+            <div style="text-align: left;">
+              <p><strong>Hubo un problema crítico al guardar tus respuestas.</strong></p>
+              <br>
+              <p><strong>Error:</strong> ${error.message}</p>
+              <br>
+              <p><strong>Por favor, contacta al administrador del sistema.</strong></p>
+              <br>
+              <p><em>No cierres esta ventana hasta que un administrador te ayude.</em></p>
+            </div>
+          `,
+          icon: 'error',
+          confirmButtonText: 'Entendido',
+          confirmButtonColor: '#f4b100',
+          background: '#ffffff',
+          color: '#4d3930'
+        })
+        return
+      }
 
     } catch (error) {
       console.error('Error finalizando quiz:', error)
-      alert('Error al finalizar el quiz. Por favor, intenta de nuevo.')
+      await Swal.fire({
+        title: '❌ Error',
+        text: 'Hubo un problema al finalizar el quiz. Por favor, intenta de nuevo.',
+        icon: 'error',
+        confirmButtonText: 'Entendido',
+        confirmButtonColor: '#f4b100'
+      })
     }
   }
 
@@ -471,46 +746,31 @@ const Quiz = () => {
             <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center mb-2 gap-2">
               <h2 className="text-lg font-bold" style={{ color: colors.white }}>Pregunta {currentQuestion + 1} de {questions.length}</h2>
               
-              {/* Indicador de progreso adaptativo */}
-              {questions.length <= 25 ? (
-                <div className="flex flex-wrap gap-1 justify-center lg:justify-end">
-                  {questions.map((_, index) => (
-                    <button
-                      key={index}
-                      onClick={() => setCurrentQuestion(index)}
-                      className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
-                        index === currentQuestion
-                          ? 'text-white'
-                          : answers[questions[index].id]
-                          ? 'text-white'
-                          : 'text-white hover:bg-opacity-30'
-                      }`}
-                      style={{
-                        backgroundColor: index === currentQuestion 
-                          ? colors.accent 
-                          : answers[questions[index].id]
-                          ? colors.secondary
-                          : colors.primary + '40'
-                      }}
-                    >
-                      {index + 1}
-                    </button>
-                  ))}
-                </div>
-              ) : (
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-white">Progreso:</span>
-                  <div className="flex-1 bg-gray-300 rounded-full h-2 w-32 lg:w-48">
-                    <div 
-                      className="bg-yellow-400 h-2 rounded-full transition-all duration-300"
-                      style={{ width: `${((currentQuestion + 1) / questions.length) * 100}%` }}
-                    ></div>
-                  </div>
-                  <span className="text-sm text-white font-bold">
-                    {Math.round(((currentQuestion + 1) / questions.length) * 100)}%
-                  </span>
-                </div>
-              )}
+              {/* Indicador de progreso con círculos numerados */}
+              <div className="flex flex-wrap gap-1 justify-center lg:justify-end">
+                {questions.map((_, index) => (
+                  <button
+                    key={index}
+                    onClick={() => setCurrentQuestion(index)}
+                    className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
+                      index === currentQuestion
+                        ? 'text-white'
+                        : answers[questions[index].id]
+                        ? 'text-white'
+                        : 'text-white hover:bg-opacity-30'
+                    }`}
+                    style={{
+                      backgroundColor: index === currentQuestion 
+                        ? colors.accent 
+                        : answers[questions[index].id]
+                        ? colors.secondary
+                        : colors.primary + '40'
+                    }}
+                  >
+                    {index + 1}
+                  </button>
+                ))}
+              </div>
             </div>
             
             {/* Barra de progreso */}

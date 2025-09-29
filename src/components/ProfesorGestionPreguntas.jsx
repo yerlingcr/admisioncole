@@ -123,6 +123,299 @@ const ProfesorGestionPreguntas = () => {
     }
   }
 
+  // Función para generar PDF de prueba para estudiantes
+  const generarPDFPruebaEstudiantes = async () => {
+    try {
+      // Importar jsPDF dinámicamente
+      const { default: jsPDF } = await import('jspdf')
+      
+      const doc = new jsPDF('portrait', 'mm', 'a4')
+      const preguntasParaImprimir = getPreguntasFiltradas()
+      
+      // Configurar fuente por defecto para todo el documento
+      doc.setFont('helvetica', 'normal')
+      
+      // Obtener configuración de la prueba
+      let configuracionPrueba = null
+      try {
+        const configuracionService = await import('../services/configuracionService')
+        configuracionPrueba = await configuracionService.default.getConfiguracionActiva(categoriaAsignada)
+      } catch (error) {
+        console.log('No se pudo obtener configuración, usando valores por defecto')
+        configuracionPrueba = {
+          tiempo_limite_minutos: 90,
+          total_preguntas: preguntasParaImprimir.length
+        }
+      }
+      
+      // ENCABEZADO INSTITUCIONAL
+      doc.setFontSize(18)
+      doc.setFont('helvetica', 'bold')
+      doc.text('Colegio Vocacional Monseñor Sanabria', 105, 20, { align: 'center' })
+      
+      doc.setFontSize(16)
+      doc.text(`Especialidad "${categoriaAsignada}"`, 105, 30, { align: 'center' })
+      
+      doc.setFontSize(14)
+      doc.text('Prueba de Admisión 2025', 105, 40, { align: 'center' })
+      
+      // INFORMACIÓN DE LA PRUEBA
+      doc.setFontSize(12)
+      doc.setFont('helvetica', 'normal')
+      doc.text(`Cantidad de Preguntas: ${configuracionPrueba?.total_preguntas || preguntasParaImprimir.length}`, 20, 55)
+      doc.text(`Tiempo Estimado: ${configuracionPrueba?.tiempo_limite_minutos || 90} minutos`, 20, 62)
+      
+      // DATOS DEL ESTUDIANTE
+      doc.setFontSize(12)
+      doc.setFont('helvetica', 'normal')
+      doc.text('Nombre del Estudiante: _____________________________________________________', 20, 75)
+      doc.text('Identificación: _______________', 20, 82)
+      
+      // INSTRUCCIONES
+      doc.setFontSize(12)
+      doc.setFont('helvetica', 'bold')
+      doc.text('Instrucciones:', 20, 95)
+      
+      doc.setFontSize(11)
+      doc.setFont('helvetica', 'normal')
+      
+      // Instrucciones detalladas
+      const instrucciones = [
+        '• Lee cuidadosamente cada pregunta.',
+        '• Usted tiene tres opciones de respuesta, marque con una equis dentro del paréntesis ( X )',
+        '• Marca únicamente una opción que consideres correcta.',
+        '• No se permiten tachaduras ni doble marcas.',
+        '• Si marcas más de una respuesta, la pregunta se anulará.',
+        '• Contesta todas las preguntas.',
+        '• Respeta el tiempo asignado para la prueba.'
+      ]
+      
+      let instruccionY = 102
+      instrucciones.forEach(instruccion => {
+        doc.text(instruccion, 20, instruccionY)
+        instruccionY += 6
+      })
+      
+      // LÍNEA SEPARADORA
+      doc.setLineWidth(0.5)
+      doc.line(20, instruccionY + 5, 190, instruccionY + 5)
+      
+      // PREGUNTAS
+      let yPosition = instruccionY + 15
+      const pageHeight = doc.internal.pageSize.getHeight()
+      const marginBottom = 20
+      
+      preguntasParaImprimir.forEach((pregunta, index) => {
+        const preguntaOpciones = opciones.filter(op => op.pregunta_id === pregunta.id)
+        
+        // Preparar texto de la pregunta
+        const preguntaTexto = pregunta.pregunta
+        const splitPregunta = doc.splitTextToSize(preguntaTexto, 160)
+        
+        // Calcular espacio necesario para toda la pregunta
+        const espacioTexto = splitPregunta.length * 5 + 5
+        const espacioImagen = pregunta.imagen_url ? 85 : 0
+        const espacioOpciones = preguntaOpciones.length * 6 + 10
+        const espacioTotal = espacioTexto + espacioImagen + espacioOpciones
+        
+        // Verificar si necesitamos nueva página para evitar cortar la pregunta
+        if (yPosition + espacioTotal > pageHeight - marginBottom) {
+          doc.addPage()
+          yPosition = 20
+        }
+        
+        // Número de pregunta
+        doc.setFontSize(12)
+        doc.setFont('helvetica', 'bold')
+        doc.text(`${index + 1}.`, 20, yPosition)
+        
+        // IMAGEN PRIMERO (si existe)
+        if (pregunta.imagen_url) {
+          try {
+            // Agregar imagen (más amplia para estudiantes - tamaño x2)
+            doc.addImage(pregunta.imagen_url, 'JPEG', 30, yPosition, 120, 80)
+            yPosition += 85
+          } catch (error) {
+            console.log('Error cargando imagen:', error)
+            doc.text('[Imagen no disponible]', 30, yPosition)
+            yPosition += 10
+          }
+        }
+        
+        // TEXTO DE LA PREGUNTA DESPUÉS
+        doc.setFontSize(11)
+        doc.setFont('helvetica', 'normal')
+        doc.text(splitPregunta, 30, yPosition)
+        
+        yPosition += splitPregunta.length * 5 + 5
+        
+        // Opciones de respuesta (SIN letras a, b, c - solo espacios para marcar)
+        preguntaOpciones.forEach((opcion, opcionIndex) => {
+          doc.setFontSize(11)
+          doc.setFont('helvetica', 'normal')
+          doc.text(`(  ) ${opcion.texto_opcion}`, 35, yPosition)
+          yPosition += 6
+        })
+        
+        yPosition += 10 // Espacio entre preguntas
+      })
+      
+      // Agregar numeración de páginas en el pie de página
+      const totalPaginas = doc.internal.getNumberOfPages()
+      for (let i = 1; i <= totalPaginas; i++) {
+        doc.setPage(i)
+        doc.setFontSize(10)
+        doc.setFont('helvetica', 'normal')
+        doc.text(`Página ${i} de ${totalPaginas}`, 105, pageHeight - 10, { align: 'center' })
+      }
+      
+      // Guardar archivo
+      const nombreArchivo = `Prueba_${categoriaAsignada}_Estudiantes_${new Date().toISOString().split('T')[0]}.pdf`
+      doc.save(nombreArchivo)
+      
+      Swal.fire({
+        title: '¡PDF Generado!',
+        text: 'El PDF de prueba para estudiantes se ha descargado exitosamente',
+        icon: 'success',
+        confirmButtonColor: '#f97316'
+      })
+    } catch (error) {
+      console.error('Error generando PDF de prueba:', error)
+      Swal.fire({
+        title: 'Error',
+        text: 'Ocurrió un error al generar el PDF de prueba',
+        icon: 'error',
+        confirmButtonColor: '#dc3545'
+      })
+    }
+  }
+
+  // Función para imprimir solo las preguntas (versión original para profesores)
+  const imprimirPreguntas = () => {
+    // Crear una nueva ventana para imprimir
+    const printWindow = window.open('', '_blank')
+    
+    // Obtener las preguntas filtradas
+    const preguntasParaImprimir = getPreguntasFiltradas()
+    
+    // Crear el HTML para imprimir
+    const htmlContent = `
+      <html>
+        <head>
+          <title>Mis Preguntas - ${categoriaAsignada}</title>
+          <style>
+            body { 
+              font-family: Arial, sans-serif; 
+              margin: 20px; 
+              line-height: 1.6;
+            }
+            .header {
+              text-align: center;
+              margin-bottom: 30px;
+              border-bottom: 2px solid #333;
+              padding-bottom: 20px;
+            }
+            .pregunta {
+              margin-bottom: 30px;
+              padding: 15px;
+              border: 1px solid #ddd;
+              border-radius: 8px;
+              page-break-inside: avoid;
+            }
+            .pregunta-id {
+              font-weight: bold;
+              color: #666;
+              margin-bottom: 10px;
+            }
+            .pregunta-texto {
+              font-size: 16px;
+              margin-bottom: 15px;
+            }
+            .imagen {
+              max-width: 300px;
+              margin: 10px 0;
+              border: 1px solid #ccc;
+            }
+            .opciones {
+              margin-left: 20px;
+            }
+            .opcion {
+              margin: 5px 0;
+            }
+            .correcta {
+              background-color: #d4edda;
+              padding: 2px 5px;
+              border-radius: 3px;
+            }
+            .categoria {
+              background-color: #f8f9fa;
+              padding: 5px 10px;
+              border-radius: 5px;
+              display: inline-block;
+              margin: 5px 5px 5px 0;
+              font-size: 12px;
+            }
+            @media print {
+              body { margin: 0; }
+              .pregunta { border: 1px solid #000; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>📋 Mis Preguntas</h1>
+            <p><strong>Categoría:</strong> ${categoriaAsignada}</p>
+            <p><strong>Total de preguntas:</strong> ${preguntasParaImprimir.length}</p>
+            <p><strong>Fecha de impresión:</strong> ${new Date().toLocaleDateString('es-CR')}</p>
+          </div>
+          
+          ${preguntasParaImprimir.map((pregunta, index) => {
+            const preguntaOpciones = opciones.filter(op => op.pregunta_id === pregunta.id)
+            return `
+              <div class="pregunta">
+                <div class="pregunta-id">Pregunta ${index + 1} (ID: ${pregunta.id})</div>
+                <div class="pregunta-texto">${pregunta.pregunta}</div>
+                
+                ${pregunta.imagen_url ? `
+                  <div>
+                    <img src="${pregunta.imagen_url}" alt="Imagen pregunta ${index + 1}" class="imagen" />
+                  </div>
+                ` : ''}
+                
+                <div class="categoria">${pregunta.categoria}</div>
+                <div class="categoria">${pregunta.nivel_dificultad}</div>
+                
+                <div class="opciones">
+                  ${preguntaOpciones.map((opcion, opcionIndex) => `
+                    <div class="opcion ${opcion.es_correcta ? 'correcta' : ''}">
+                      ${String.fromCharCode(97 + opcionIndex)}. ${opcion.texto_opcion}
+                      ${opcion.es_correcta ? ' ✓' : ''}
+                    </div>
+                  `).join('')}
+                </div>
+              </div>
+            `
+          }).join('')}
+          
+          <div style="margin-top: 50px; text-align: center; font-size: 12px; color: #666;">
+            <p>Sistema de Admisión 2025 - Generado el ${new Date().toLocaleString('es-CR')}</p>
+          </div>
+        </body>
+      </html>
+    `
+    
+    // Escribir el contenido y imprimir
+    printWindow.document.write(htmlContent)
+    printWindow.document.close()
+    printWindow.focus()
+    
+    // Esperar un momento para que se cargue el contenido
+    setTimeout(() => {
+      printWindow.print()
+      printWindow.close()
+    }, 1000)
+  }
+
   // Función para filtrar preguntas por usuario creador y búsqueda
   const getPreguntasFiltradas = () => {
     let preguntasFiltradas = preguntas
@@ -921,15 +1214,36 @@ const ProfesorGestionPreguntas = () => {
                 📋 Mis Preguntas ({getPreguntasFiltradas().length})
               </h2>
               
-              {/* Campo de Búsqueda */}
-              <div className="form-control">
-                <input
-                  type="text"
-                  placeholder="🔍 Buscar por texto o ID..."
-                  value={busqueda}
-                  onChange={(e) => setBusqueda(e.target.value)}
-                  className="input input-bordered w-full max-w-xs bg-white border-gray-300 text-gray-800"
-                />
+              {/* Botones de Acción */}
+              <div className="flex flex-col sm:flex-row gap-3 items-center">
+                {/* Campo de Búsqueda */}
+                <div className="form-control">
+                  <input
+                    type="text"
+                    placeholder="🔍 Buscar por texto o ID..."
+                    value={busqueda}
+                    onChange={(e) => setBusqueda(e.target.value)}
+                    className="input input-bordered w-full max-w-xs bg-white border-gray-300 text-gray-800"
+                  />
+                </div>
+                
+                {/* Botón de Imprimir */}
+                <button
+                  onClick={imprimirPreguntas}
+                  className="btn btn-outline btn-sm"
+                  disabled={getPreguntasFiltradas().length === 0}
+                >
+                  🖨️ Imprimir
+                </button>
+                
+                {/* Botón de PDF para Estudiantes */}
+                <button
+                  onClick={generarPDFPruebaEstudiantes}
+                  className="btn btn-primary btn-sm"
+                  disabled={getPreguntasFiltradas().length === 0}
+                >
+                  📄 PDF Estudiantes
+                </button>
               </div>
             </div>
             

@@ -429,10 +429,29 @@ const GestionUsuarios = () => {
       resetForm()
     } catch (error) {
       console.error('❌ Error guardando usuario:', error)
+      
+      // Determinar el tipo de error y mostrar mensaje apropiado
+      let errorMessage = ''
+      let errorTitle = ''
+      
+      if (error.message.includes('duplicate key value violates unique constraint "usuarios_pkey"')) {
+        errorTitle = '⚠️ Usuario Ya Existe'
+        errorMessage = `La identificación "${formData.identificacion}" ya está registrada en el sistema.\n\nPor favor, usa una identificación diferente.`
+      } else if (error.message.includes('duplicate key value violates unique constraint "usuarios_email_key"')) {
+        errorTitle = '⚠️ Email Ya Registrado'
+        errorMessage = `El email "${formData.email}" ya está siendo usado por otro usuario.\n\nPor favor, usa un email diferente.`
+      } else if (error.message.includes('violates check constraint')) {
+        errorTitle = '⚠️ Datos Incorrectos'
+        errorMessage = 'Algunos de los datos ingresados no son válidos.\n\nPor favor, revisa todos los campos y vuelve a intentar.'
+      } else {
+        errorTitle = '⚠️ Error al Guardar'
+        errorMessage = 'Hubo un problema al guardar el usuario.\n\nPor favor, intenta de nuevo.'
+      }
+      
       await Swal.fire({
         icon: 'error',
-        title: 'Error al Guardar',
-        text: `Error guardando usuario: ${error.message}`,
+        title: errorTitle,
+        text: errorMessage,
         confirmButtonText: 'Entendido',
         confirmButtonColor: '#b47b21',
         background: '#ffffff',

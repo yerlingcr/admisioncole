@@ -222,17 +222,22 @@ class QuizService {
     }
   }
 
-  // Guardar respuesta del estudiante
+  // Guardar respuesta del estudiante (con upsert para evitar duplicados)
   async saveStudentAnswer(intentoId, preguntaId, opcionSeleccionadaId, tiempoRespuesta, esCorrecta) {
     try {
+      // Usar upsert para insertar o actualizar automáticamente
       const { data, error } = await supabase
         .from('respuestas_estudiante')
-        .insert({
+        .upsert({
           intento_id: intentoId,
           pregunta_id: preguntaId,
           opcion_seleccionada_id: opcionSeleccionadaId,
+          es_correcta: esCorrecta,
           tiempo_respuesta_segundos: tiempoRespuesta,
-          es_correcta: esCorrecta
+          fecha_respuesta: new Date().toISOString()
+        }, {
+          onConflict: 'intento_id,pregunta_id', // Usar clave única compuesta
+          ignoreDuplicates: false
         })
         .select()
         .single()
@@ -248,6 +253,56 @@ class QuizService {
   // Finalizar intento de quiz
   async finishQuizAttempt(intentoId, tiempoTotal, puntuacionTotal, preguntasRespondidas, preguntasCorrectas) {
     try {
+      // SINCRONIZACIÓN AUTOMÁTICA: Verificar datos reales de respuestas_estudiante
+      const { data: respuestasReales, error: errorRespuestas } = await supabase
+        .from('respuestas_estudiante')
+        .select('pregunta_id, es_correcta, fecha_respuesta')
+        .eq('intento_id', intentoId)
+        .order('pregunta_id, fecha_respuesta', { ascending: true })
+
+      if (errorRespuestas) {
+        console.error('Error obteniendo respuestas reales:', errorRespuestas)
+        throw errorRespuestas
+      }
+
+      // Agrupar respuestas por pregunta_id y usar solo la última respuesta de cada pregunta
+      const respuestasPorPregunta = {}
+      respuestasReales.forEach((respuesta) => {
+        if (!respuestasPorPregunta[respuesta.pregunta_id]) {
+          respuestasPorPregunta[respuesta.pregunta_id] = []
+        }
+        respuestasPorPregunta[respuesta.pregunta_id].push(respuesta)
+      })
+
+      // Calcular datos REALES usando solo la última respuesta de cada pregunta
+      let respuestasGuardadasReales = 0
+      let correctasReales = 0
+
+      Object.keys(respuestasPorPregunta).forEach(preguntaId => {
+        const respuestasPregunta = respuestasPorPregunta[preguntaId]
+        const ultimaRespuesta = respuestasPregunta[respuestasPregunta.length - 1] // Usar la última respuesta
+        
+        respuestasGuardadasReales++
+        const esCorrecta = ultimaRespuesta.es_correcta === true || ultimaRespuesta.es_correcta === 1 || ultimaRespuesta.es_correcta === "true"
+        if (esCorrecta) {
+          correctasReales++
+        }
+      })
+
+      // Contar duplicados para logging
+      const totalRespuestas = respuestasReales.length
+      const duplicados = totalRespuestas - respuestasGuardadasReales
+
+      console.log('🔄 SINCRONIZACIÓN AUTOMÁTICA:', {
+        intentoId,
+        datosEnviados: { preguntasRespondidas, preguntasCorrectas },
+        datosRealesBD: { respuestasGuardadasReales, correctasReales },
+        totalRespuestasEnBD: totalRespuestas,
+        respuestasDuplicadas: duplicados,
+        sincronizado: respuestasGuardadasReales === preguntasRespondidas && correctasReales === preguntasCorrectas
+      })
+
+      // Usar los datos REALES de la BD, no los enviados
       const { data, error } = await supabase
         .from('intentos_quiz')
         .update({
@@ -255,14 +310,21 @@ class QuizService {
           fecha_fin: new Date().toISOString(),
           tiempo_total_segundos: tiempoTotal,
           puntuacion_total: puntuacionTotal,
-          preguntas_respondidas: preguntasRespondidas,
-          preguntas_correctas: preguntasCorrectas
+          preguntas_respondidas: respuestasGuardadasReales, // Datos REALES
+          preguntas_correctas: correctasReales // Datos REALES
         })
         .eq('id', intentoId)
         .select()
         .single()
 
       if (error) throw error
+      
+      console.log('✅ SINCRONIZACIÓN COMPLETADA:', {
+        intentoId,
+        preguntasRespondidas: respuestasGuardadasReales,
+        preguntasCorrectas: correctasReales
+      })
+
       return data
     } catch (error) {
       console.error('Error finalizando intento de quiz:', error)

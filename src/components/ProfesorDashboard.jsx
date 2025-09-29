@@ -8,6 +8,8 @@ import usuarioCategoriasService from '../services/usuarioCategoriasService'
 import OptimizedStatsService from '../services/optimizedStatsService'
 import Swal from 'sweetalert2'
 import jsPDF from 'jspdf'
+import autoTable from 'jspdf-autotable'
+import * as XLSX from 'xlsx'
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend } from 'chart.js'
 import { Bar } from 'react-chartjs-2'
 import ProfesorGestionPreguntas from './ProfesorGestionPreguntas'
@@ -63,6 +65,14 @@ const ProfesorDashboard = () => {
       loadTopEstudiantes()
       loadPreguntasFallidas()
       loadPreguntasAcertadas()
+    }
+  }, [seccionActiva, categoriaAsignada, userInfo])
+
+  // Cargar notas cuando se cambie a la sección de notas
+  useEffect(() => {
+    if (categoriaAsignada && userInfo && seccionActiva === 'notas') {
+      console.log('🔄 Cargando notas de estudiantes...')
+      loadNotasEstudiantes()
     }
   }, [seccionActiva, categoriaAsignada, userInfo])
 
@@ -357,6 +367,125 @@ const ProfesorDashboard = () => {
     }
   }
 
+  // Función para exportar notas a Excel
+  const exportarAExcel = () => {
+    try {
+      const datosParaExportar = getNotasFiltradas().map((estudiante, index) => ({
+        '#': index + 1,
+        'Identificación': estudiante.identificacion,
+        'Nombre': estudiante.nombre,
+        'Apellidos': `${estudiante.primer_apellido} ${estudiante.segundo_apellido || ''}`.trim(),
+        'Nota Obtenida': estudiante.notaObtenida,
+        'Puntos': estudiante.puntosObtenidos,
+        '%': estudiante.porcentajePonderado
+      }))
+
+      // Crear libro de trabajo
+      const wb = XLSX.utils.book_new()
+      const ws = XLSX.utils.json_to_sheet(datosParaExportar)
+
+      // Agregar hoja al libro
+      XLSX.utils.book_append_sheet(wb, ws, 'Notas de Estudiantes')
+
+      // Generar archivo Excel
+      const nombreArchivo = `Notas_${categoriaAsignada}_${new Date().toISOString().split('T')[0]}.xlsx`
+      XLSX.writeFile(wb, nombreArchivo)
+
+      Swal.fire({
+        title: '¡Excel Generado!',
+        text: 'El archivo Excel se ha descargado exitosamente',
+        icon: 'success',
+        confirmButtonColor: '#f97316'
+      })
+    } catch (error) {
+      console.error('Error generando Excel:', error)
+      Swal.fire({
+        title: 'Error',
+        text: 'Ocurrió un error al generar el archivo Excel',
+        icon: 'error',
+        confirmButtonColor: '#dc3545'
+      })
+    }
+  }
+
+  // Función para exportar notas a PDF
+  const exportarAPDF = () => {
+    try {
+      const doc = new jsPDF('landscape', 'mm', 'a4')
+      
+      // Título
+      doc.setFontSize(16)
+      doc.setFont('helvetica', 'bold')
+      doc.text('Notas de Estudiantes', 20, 20)
+      
+      // Información de la especialidad
+      doc.setFontSize(12)
+      doc.setFont('helvetica', 'normal')
+      doc.text(`Especialidad: ${categoriaAsignada}`, 20, 30)
+      doc.text(`Fecha: ${new Date().toLocaleDateString('es-CR')}`, 20, 35)
+      doc.text(`Total de estudiantes: ${getNotasFiltradas().length}`, 20, 40)
+
+      // Preparar datos para la tabla
+      const datosTabla = getNotasFiltradas().map((estudiante, index) => [
+        index + 1,
+        estudiante.identificacion,
+        estudiante.nombre,
+        `${estudiante.primer_apellido} ${estudiante.segundo_apellido || ''}`.trim(),
+        estudiante.notaObtenida,
+        estudiante.puntosObtenidos,
+        `${estudiante.porcentajePonderado}%`
+      ])
+
+      // Crear tabla
+      autoTable(doc, {
+        startY: 50,
+        head: [['#', 'Identificación', 'Nombre', 'Apellidos', 'Nota Obtenida', 'Puntos', '%']],
+        body: datosTabla,
+        styles: {
+          fontSize: 10,
+          cellPadding: 3,
+        },
+        headStyles: {
+          fillColor: [77, 57, 48], // Color café
+          textColor: 255,
+          fontStyle: 'bold'
+        },
+        alternateRowStyles: {
+          fillColor: [245, 245, 245]
+        },
+        margin: { left: 20, right: 20 }
+      })
+
+      // Pie de página
+      const pageCount = doc.internal.getNumberOfPages()
+      for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i)
+        doc.setFontSize(8)
+        doc.setFont('helvetica', 'italic')
+        doc.text(`Sistema de Admisión 2025 - Página ${i} de ${pageCount}`, 20, doc.internal.pageSize.getHeight() - 10)
+      }
+
+      // Guardar archivo
+      const nombreArchivo = `Notas_${categoriaAsignada}_${new Date().toISOString().split('T')[0]}.pdf`
+      doc.save(nombreArchivo)
+
+      Swal.fire({
+        title: '¡PDF Generado!',
+        text: 'El archivo PDF se ha descargado exitosamente',
+        icon: 'success',
+        confirmButtonColor: '#f97316'
+      })
+    } catch (error) {
+      console.error('Error generando PDF:', error)
+      Swal.fire({
+        title: 'Error',
+        text: 'Ocurrió un error al generar el archivo PDF',
+        icon: 'error',
+        confirmButtonColor: '#dc3545'
+      })
+    }
+  }
+
   const generarPDFIndividual = async () => {
     if (!estudianteSeleccionado || !detallesPrueba) return
 
@@ -414,6 +543,24 @@ const ProfesorDashboard = () => {
       yPosition += 8
       doc.text(`Nota obtenida: ${estudianteSeleccionado.notaObtenida}`, margin, yPosition)
       
+      yPosition += 15
+      
+      // Agregar resumen de estadísticas usando datos reales
+      doc.setFontSize(14)
+      doc.setFont('times', 'bold')
+      doc.text('Resumen de Resultados:', margin, yPosition)
+      yPosition += 12
+      
+      doc.setFontSize(12)
+      doc.setFont('times', 'normal')
+      doc.text(`• Preguntas correctas: ${detallesPrueba.intento.preguntas_correctas}`, margin + 5, yPosition)
+      yPosition += 8
+      doc.text(`• Preguntas incorrectas: ${detallesPrueba.intento.preguntas_respondidas - detallesPrueba.intento.preguntas_correctas}`, margin + 5, yPosition)
+      yPosition += 8
+      doc.text(`• Preguntas sin responder: ${estudianteSeleccionado.totalPreguntas - detallesPrueba.intento.preguntas_respondidas}`, margin + 5, yPosition)
+      yPosition += 8
+      doc.text(`• Total de preguntas: ${detallesPrueba.intento.preguntas_respondidas}`, margin + 5, yPosition)
+      
       yPosition += 20
       
       // Agregar preguntas y respuestas
@@ -422,8 +569,20 @@ const ProfesorDashboard = () => {
       doc.text('Preguntas y Respuestas:', margin, yPosition)
       yPosition += 15
       
+      // El PDF refleja SOLO los datos oficiales de la Base de Datos
+      // Usamos estudianteSeleccionado que viene directamente de intentos_quiz
+      
+      // Para mostrar en el PDF, simplemente usamos los datos de BD
+      // y marcamos las preguntas según las respuestas guardadas
       for (let index = 0; index < detallesPrueba.todasLasPreguntas.length; index++) {
         const pregunta = detallesPrueba.todasLasPreguntas[index]
+        
+        // Verificar si esta pregunta fue respondida correctamente
+        const respuestaEstudiante = detallesPrueba.respuestas.find(r => 
+          r.pregunta.id === pregunta.id
+        )
+        
+        // Solo mostrar visualmente - sin análisis de conteo problemático
         
         // Calcular espacio necesario para la pregunta completa
         doc.setFontSize(12)
@@ -494,10 +653,7 @@ const ProfesorDashboard = () => {
         doc.text(preguntaLines, margin, yPosition)
         yPosition += preguntaHeight
         
-        // Buscar la respuesta del estudiante
-        const respuestaEstudiante = detallesPrueba.respuestas.find(r => 
-          r.pregunta.id === pregunta.id
-        )
+        // Usar la respuestaEstudiante ya declarada arriba
         
         // Agregar opciones
         doc.setFontSize(12)
@@ -505,19 +661,24 @@ const ProfesorDashboard = () => {
         
         pregunta.opciones_respuesta.forEach((opcion, opcionIndex) => {
           const esRespuestaEstudiante = respuestaEstudiante && respuestaEstudiante.opcion_seleccionada_id === opcion.id
-          const esCorrecta = opcion.es_correcta
+          const esLaRespuestaCorrecta = opcion.es_correcta
           
           let textoOpcion = `${String.fromCharCode(97 + opcionIndex)}. ${opcion.texto_opcion}`
           if (esRespuestaEstudiante) textoOpcion += ' ✓ (R/ Estudiante)'
-          if (esCorrecta) textoOpcion += ' ✓ (Correcta)'
+          if (esLaRespuestaCorrecta) textoOpcion += ' ✓ (Correcta)'
           
           const opcionLines = doc.splitTextToSize(textoOpcion, contentWidth - 10)
           doc.text(opcionLines, margin + 10, yPosition)
           yPosition += (opcionLines.length * 6) + 2
         })
         
+        // Solo mostrar visualmente - sin conteo problemático
+        
         yPosition += 10
       }
+      
+      // El PDF usa SOLO los datos oficiales de intentos_quiz
+      // No hay análisis de discrepancias - fuente única de verdad
       
       // Obtener el número total de páginas
       const totalPages = doc.internal.getNumberOfPages()
@@ -1065,7 +1226,7 @@ const ProfesorDashboard = () => {
       const estudianteIds = estudiantesCategoria.map(e => e.usuario_id)
       const { data: intentos, error: errorIntentos } = await supabase
         .from('intentos_quiz')
-        .select('estudiante_id, puntuacion_total, fecha_fin')
+        .select('estudiante_id, puntuacion_total, fecha_fin, preguntas_correctas, preguntas_respondidas')
         .in('estudiante_id', estudianteIds)
         .not('fecha_fin', 'is', null)
         .not('puntuacion_total', 'is', null)
@@ -1085,7 +1246,30 @@ const ProfesorDashboard = () => {
           return actual.puntuacion_total > mejor.puntuacion_total ? actual : mejor
         }, { puntuacion_total: 0 })
 
-        const puntosObtenidos = Math.round((mejorIntento.puntuacion_total / 100) * totalPreguntas)
+        // Determinar si el estudiante ha realizado intentos
+        const haRealizadoIntento = intentosEstudiante.length > 0 && mejorIntento.puntuacion_total > 0
+        
+        let totalPreguntasEstudiante = totalPreguntas // Valor por defecto de configuración
+        let puntosObtenidos = 0
+        let preguntasCorrectas = 0
+        let preguntasIncorrectas = 0
+        let preguntasSinResponder = 0
+        
+        if (haRealizadoIntento) {
+          // Estudiante SÍ tiene intentos válidos
+          totalPreguntasEstudiante = Math.max(mejorIntento.preguntas_respondidas || 0, totalPreguntas)
+          puntosObtenidos = mejorIntento.preguntas_correctas || 0
+          preguntasCorrectas = mejorIntento.preguntas_correctas || 0
+          preguntasIncorrectas = (mejorIntento.preguntas_respondidas || 0) - (mejorIntento.preguntas_correctas || 0)
+          preguntasSinResponder = Math.max(0, totalPreguntasEstudiante - (mejorIntento.preguntas_respondidas || 0))
+        } else {
+          // Estudiante NO tiene intentos válidos - valores por defecto
+          totalPreguntasEstudiante = totalPreguntas
+          puntosObtenidos = 0
+          preguntasCorrectas = 0
+          preguntasIncorrectas = 0
+          preguntasSinResponder = 0 // DEBE ser 0 porque no ha respondido nada
+        }
         const porcentajePonderado = ((mejorIntento.puntuacion_total * porcentajePrueba) / 100).toFixed(2)
 
         return {
@@ -1096,16 +1280,25 @@ const ProfesorDashboard = () => {
           categoria: categoriaAsignada, // Agregar la categoría del profesor
           notaObtenida: mejorIntento.puntuacion_total || 0,
           puntosObtenidos,
+          preguntasCorrectas,
+          preguntasIncorrectas,
+          preguntasSinResponder,
+          totalPreguntas: totalPreguntasEstudiante, // Usar el total específico del estudiante
           porcentajePonderado,
           intentosRealizados: intentosEstudiante.length,
           puntuacionMinima: puntuacionMinima
         }
       })
 
-      // Ordenar por nota obtenida (mayor a menor)
-      notasConEstudiantes.sort((a, b) => b.notaObtenida - a.notaObtenida)
+      // Filtrar solo estudiantes que han realizado la prueba
+      const estudiantesConPrueba = notasConEstudiantes.filter(estudiante => 
+        estudiante.intentosRealizados > 0 && estudiante.notaObtenida > 0
+      )
 
-      setNotasEstudiantes(notasConEstudiantes)
+      // Ordenar por nota obtenida (mayor a menor)
+      estudiantesConPrueba.sort((a, b) => b.notaObtenida - a.notaObtenida)
+
+      setNotasEstudiantes(estudiantesConPrueba)
       
     } catch (error) {
       console.error('❌ Error cargando notas:', error)
@@ -1427,7 +1620,7 @@ const ProfesorDashboard = () => {
         )}
 
         {/* Sección de Notas de Estudiantes */}
-        {categoriaAsignada && (seccionActiva === 'notas' || seccionActiva === 'dashboard') && (
+        {categoriaAsignada && (seccionActiva === 'notas') && (
           <div id="notas-estudiantes" className="mt-8">
             <div className="card bg-white border border-gray-300 shadow-lg">
               <div className="card-body">
@@ -1435,22 +1628,38 @@ const ProfesorDashboard = () => {
                   <h2 className="card-title text-xl text-gray-800">
                     📊 Notas de Estudiantes - "{typeof categoriaAsignada === 'string' ? categoriaAsignada : categoriaAsignada.nombre}"
                   </h2>
-                  <button
-                    onClick={loadNotasEstudiantes}
-                    className="btn btn-sm btn-outline"
-                    disabled={loadingNotas}
-                  >
-                    {loadingNotas ? (
-                      <>
-                        <span className="loading loading-spinner loading-xs"></span>
-                        Cargando...
-                      </>
-                    ) : (
-                      <>
-                        🔄 Actualizar
-                      </>
-                    )}
-                  </button>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={loadNotasEstudiantes}
+                      className="btn btn-sm btn-outline"
+                      disabled={loadingNotas}
+                    >
+                      {loadingNotas ? (
+                        <>
+                          <span className="loading loading-spinner loading-xs"></span>
+                          Cargando...
+                        </>
+                      ) : (
+                        <>
+                          🔄 Actualizar
+                        </>
+                      )}
+                    </button>
+                    <button
+                      onClick={exportarAExcel}
+                      className="btn btn-sm btn-success"
+                      disabled={loadingNotas || getNotasFiltradas().length === 0}
+                    >
+                      📊 Excel
+                    </button>
+                    <button
+                      onClick={exportarAPDF}
+                      className="btn btn-sm btn-error"
+                      disabled={loadingNotas || getNotasFiltradas().length === 0}
+                    >
+                      📄 PDF
+                    </button>
+                  </div>
                 </div>
 
                 {/* Barra de búsqueda */}
@@ -1484,8 +1693,8 @@ const ProfesorDashboard = () => {
                           <th className="text-gray-700 font-semibold">Nombre</th>
                           <th className="text-gray-700 font-semibold">Apellidos</th>
                           <th className="text-gray-700 font-semibold">Nota Obtenida</th>
-                          <th className="text-gray-700 font-semibold">Puntos Obtenidos</th>
-                          <th className="text-gray-700 font-semibold">%</th>
+                          <th className="text-gray-700 font-semibold text-center">Puntos</th>
+                          <th className="text-gray-700 font-semibold text-center">%</th>
                           <th className="text-gray-700 font-semibold">Estado</th>
                           <th className="text-gray-700 font-semibold">Acciones</th>
                         </tr>
@@ -1516,29 +1725,34 @@ const ProfesorDashboard = () => {
                                 {estudiante.notaObtenida}
                               </span>
                             </td>
-                            <td>
-                              <span className="badge badge-info">
-                                {estudiante.puntosObtenidos}
-                              </span>
+                            <td className="text-center">
+                              <div className="flex items-center justify-center space-x-1">
+                                <span className="badge badge-info badge-sm">
+                                  {estudiante.puntosObtenidos}
+                                </span>
+                                <span className="text-xs text-gray-500">pts</span>
+                              </div>
                             </td>
-                            <td>
-                              <span className="badge badge-warning">
+                            <td className="text-center">
+                              <span className="badge badge-warning badge-sm">
                                 {estudiante.porcentajePonderado}%
                               </span>
                             </td>
                             <td>
-                              <span 
-                                className={`badge badge-sm ${
-                                  estudiante.notaObtenida > estudiante.puntuacionMinima 
-                                    ? 'badge-success' 
-                                    : 'badge-error'
-                                }`}
-                              >
-                                {estudiante.notaObtenida > estudiante.puntuacionMinima 
-                                  ? '✅ Aprobado' 
-                                  : '❌ Reprobado'
-                                }
-                              </span>
+                              <div className="flex items-center justify-center">
+                                <span 
+                                  className={`badge font-medium px-3 ${
+                                    estudiante.notaObtenida > estudiante.puntuacionMinima 
+                                      ? 'badge-success' 
+                                      : 'badge-error'
+                                  }`}
+                                >
+                                  {estudiante.notaObtenida > estudiante.puntuacionMinima 
+                                    ? '✓ Ganó' 
+                                    : '✗ Falló'
+                                  }
+                                </span>
+                              </div>
                             </td>
                             <td>
                               <button
@@ -1573,8 +1787,8 @@ const ProfesorDashboard = () => {
                     </h3>
                     <p className="text-gray-500">
                       {busquedaNotas.trim() 
-                        ? `No hay estudiantes que coincidan con "${busquedaNotas}".`
-                        : 'Los estudiantes de esta categoría aún no han completado la prueba.'
+                        ? `No hay resultados que coincidan con "${busquedaNotas}".`
+                        : 'Aún no hay estudiantes que hayan completado la prueba.'
                       }
                     </p>
                   </div>
@@ -1587,13 +1801,13 @@ const ProfesorDashboard = () => {
                         <div className="text-2xl font-bold text-green-600">
                           {notasEstudiantes.filter(e => e.notaObtenida > e.puntuacionMinima).length}
                         </div>
-                        <div className="text-sm text-gray-600">Aprobados</div>
+                        <div className="text-sm text-gray-600">✓ Ganaron</div>
                       </div>
                       <div>
                         <div className="text-2xl font-bold text-red-600">
                           {notasEstudiantes.filter(e => e.notaObtenida <= e.puntuacionMinima).length}
                         </div>
-                        <div className="text-sm text-gray-600">Reprobados</div>
+                        <div className="text-sm text-gray-600">✗ Fallaron</div>
                       </div>
                     </div>
                     <div className="mt-4 text-center">
@@ -1669,14 +1883,17 @@ const ProfesorDashboard = () => {
                     </div>
                     <div>
                       <span className="text-sm font-medium text-gray-600">Puntos obtenidos:</span>
-                      <div className="flex items-center mt-2">
+                      <div className="flex items-center mt-2 space-x-2">
                         <span className="badge badge-info badge-lg font-bold text-lg">
                           {estudianteSeleccionado.puntosObtenidos}
+                        </span>
+                        <span className="text-sm text-gray-500">
+                          de {estudianteSeleccionado.totalPreguntas} preguntas
                         </span>
                       </div>
                     </div>
                     <div>
-                      <span className="text-sm font-medium text-gray-600">Porcentaje ponderado:</span>
+                      <span className="text-sm font-medium text-gray-600">Porcentaje:</span>
                       <div className="flex items-center mt-2">
                         <span className="badge badge-warning badge-lg font-bold text-lg">
                           {estudianteSeleccionado.porcentajePonderado}%
@@ -1781,8 +1998,8 @@ const ProfesorDashboard = () => {
           </div>
         )}
 
-        {/* Sección de Mis Preguntas - Solo en Dashboard */}
-        {seccionActiva === 'dashboard' && (
+        {/* Sección de Mis Preguntas - Solo en Dashboard - DESHABILITADA */}
+        {false && seccionActiva === 'dashboard' && (
           <div className="mt-8">
             <div className="card bg-white border border-gray-300 shadow-lg">
               <div className="card-body">
@@ -1795,8 +2012,8 @@ const ProfesorDashboard = () => {
           </div>
         )}
 
-        {/* Sección de Mis Estudiantes - Solo en Dashboard */}
-        {seccionActiva === 'dashboard' && (
+        {/* Sección de Mis Estudiantes - Solo en Dashboard - DESHABILITADA */}
+        {false && seccionActiva === 'dashboard' && (
           <div className="mt-8">
             <div className="card bg-white border border-gray-300 shadow-lg">
               <div className="card-body">
@@ -1809,8 +2026,8 @@ const ProfesorDashboard = () => {
           </div>
         )}
 
-        {/* Gráfico Top 10 Estudiantes */}
-        {categoriaAsignada && topEstudiantesData && (seccionActiva === 'graficos' || seccionActiva === 'dashboard') && (
+        {/* Gráfico Top 10 Estudiantes - DESHABILITADO DEL DASHBOARD */}
+        {categoriaAsignada && topEstudiantesData && (seccionActiva === 'graficos') && (
           <div className="mt-8 chart-print-container">
             <div className="card bg-white border border-gray-300 shadow-lg">
               <div className="card-body">

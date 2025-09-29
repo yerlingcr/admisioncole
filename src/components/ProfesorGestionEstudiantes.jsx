@@ -274,11 +274,29 @@ const ProfesorGestionEstudiantes = () => {
       })
     } catch (error) {
       console.error('❌ Error en el proceso:', error)
+      
+      // Determinar el tipo de error y mostrar mensaje apropiado
+      let errorMessage = ''
+      let errorTitle = ''
+      
+      if (error.message.includes('duplicate key value violates unique constraint "usuarios_pkey"')) {
+        errorTitle = '⚠️ Estudiante Ya Existe'
+        errorMessage = `La identificación "${formData.identificacion}" ya está registrada en el sistema.\n\nPor favor, usa una identificación diferente.`
+      } else if (error.message.includes('duplicate key value violates unique constraint')) {
+        errorTitle = '⚠️ Datos Duplicados'
+        errorMessage = 'Algunos datos ya están siendo usados por otro usuario.\n\nPor favor, verifica la identificación y el email.'
+      } else {
+        errorTitle = '⚠️ Error al Guardar'
+        errorMessage = 'Hubo un problema al guardar el estudiante.\n\nPor favor, intenta de nuevo.'
+      }
+      
       Swal.fire({
         icon: 'error',
-        title: 'Error',
-        text: 'Error al guardar el estudiante: ' + error.message,
-        confirmButtonColor: '#d33'
+        title: errorTitle,
+        text: errorMessage,
+        confirmButtonColor: '#d33',
+        background: '#ffffff',
+        color: '#4d3930'
       })
     }
   }

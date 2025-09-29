@@ -98,7 +98,7 @@ const Login = () => {
 
               {/* Footer del Panel Izquierdo - Solo visible en desktop */}
               <div className="hidden lg:block text-center text-white text-sm relative z-10">
-                <p className="drop-shadow-xl font-medium">© 2025, Todos los Derechos Reservados, ver. 1.1.5</p>
+                <p className="drop-shadow-xl font-medium">© 2025, Todos los Derechos Reservados, ver. 1.1.6</p>
                 <p className="drop-shadow-xl font-medium">
                   Desarrollado por{' '}
                   <a 
