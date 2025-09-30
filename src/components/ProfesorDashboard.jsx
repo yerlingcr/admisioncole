@@ -1717,7 +1717,7 @@ const ProfesorDashboard = () => {
                             <td>
                               <span 
                                 className={`badge badge-lg font-bold ${
-                                  estudiante.notaObtenida > estudiante.puntuacionMinima 
+                                  estudiante.notaObtenida >= estudiante.puntuacionMinima 
                                     ? 'badge-success' 
                                     : 'badge-error'
                                 }`}
@@ -1742,12 +1742,12 @@ const ProfesorDashboard = () => {
                               <div className="flex items-center justify-center">
                                 <span 
                                   className={`badge font-medium px-3 ${
-                                    estudiante.notaObtenida > estudiante.puntuacionMinima 
+                                    estudiante.notaObtenida >= estudiante.puntuacionMinima 
                                       ? 'badge-success' 
                                       : 'badge-error'
                                   }`}
                                 >
-                                  {estudiante.notaObtenida > estudiante.puntuacionMinima 
+                                  {estudiante.notaObtenida >= estudiante.puntuacionMinima 
                                     ? '✓ Ganó' 
                                     : '✗ Falló'
                                   }
@@ -1799,13 +1799,13 @@ const ProfesorDashboard = () => {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-center">
                       <div>
                         <div className="text-2xl font-bold text-green-600">
-                          {notasEstudiantes.filter(e => e.notaObtenida > e.puntuacionMinima).length}
+                          {notasEstudiantes.filter(e => e.notaObtenida >= e.puntuacionMinima).length}
                         </div>
                         <div className="text-sm text-gray-600">✓ Ganaron</div>
                       </div>
                       <div>
                         <div className="text-2xl font-bold text-red-600">
-                          {notasEstudiantes.filter(e => e.notaObtenida <= e.puntuacionMinima).length}
+                          {notasEstudiantes.filter(e => e.notaObtenida < e.puntuacionMinima).length}
                         </div>
                         <div className="text-sm text-gray-600">✗ Fallaron</div>
                       </div>
@@ -1873,7 +1873,7 @@ const ProfesorDashboard = () => {
                       <span className="text-sm font-medium text-gray-600">Nota obtenida:</span>
                       <div className="flex items-center mt-2">
                         <span className={`badge badge-lg font-bold text-lg ${
-                          estudianteSeleccionado.notaObtenida > estudianteSeleccionado.puntuacionMinima 
+                          estudianteSeleccionado.notaObtenida >= estudianteSeleccionado.puntuacionMinima 
                             ? 'badge-success' 
                             : 'badge-error'
                         }`}>
